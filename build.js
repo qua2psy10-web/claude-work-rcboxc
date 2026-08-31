@@ -3,11 +3,14 @@
  * 単一HTMLへの結合スクリプト(外部依存なし)
  *
  * src/ 以下の ES モジュールを依存関係を保ったまま1つの古典スクリプトに畳み込み、
- * CSS とともに dist/index.html にインライン展開する。
+ * CSS とともにリポジトリ直下の index.html にインライン展開する。
  * これにより file:// で直接開いても動作する配布物になる。
+ *
+ * 出力先の index.html は GitHub Pages が配信するファイルでもある。
+ * ここを別の場所へ移すと公開サイトのトップURLが 404 に戻るので注意。
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -86,9 +89,8 @@ if (html.includes('<link rel="stylesheet"') || html.includes('type="module"')) {
   throw new Error('index.html の置換に失敗しました(外部参照が残っています)。');
 }
 
-mkdirSync(join(root, 'dist'), { recursive: true });
-const out = join(root, 'dist', 'index.html');
+const out = join(root, 'index.html');
 writeFileSync(out, html);
 
 const kb = (Buffer.byteLength(html) / 1024).toFixed(1);
-console.log(`dist/index.html を生成しました(${modules.size} モジュール、${kb} KB)`);
+console.log(`index.html を生成しました(${modules.size} モジュール、${kb} KB)`);

@@ -5,7 +5,11 @@
 
 ## 使い方
 
-`dist/index.html` をブラウザで開くだけです(オフライン可、インストール不要)。
+**<https://qua2psy10-web.github.io/claude-work-rcboxc/>** をブラウザで開くだけです。
+
+リポジトリ直下の `index.html` を保存してローカルで開いても同じように動きます
+(単一ファイルで完結しているためオフライン可、インストール不要)。
+
 左の入力欄を変更すると即座に再計算され、中央に図、右に照査結果が表示されます。
 「計算書を印刷」でブラウザの印刷機能からPDF化できます。
 
@@ -13,7 +17,7 @@
 
 ```sh
 npm test        # 計算コアの検証(node:test、30ケース)
-npm run build   # src/ を結合して dist/index.html を生成
+npm run build   # src/ を結合して index.html を生成
 ```
 
 ## 機能
@@ -83,8 +87,14 @@ src/core/    DOMに依存しない計算モジュール
 src/ui/      画面描画と入出力
 test/        node:test による検証
 build.js     単一HTMLへの結合スクリプト
-dist/        配布物(index.html)
+index.html   ビルド成果物。GitHub Pages が配信する公開物
+.nojekyll    Pages で Jekyll の処理を行わせないための空ファイル
 ```
+
+`index.html` と `src/index.html` は役割が異なります。
+**直下の `index.html` はビルド成果物**(全モジュールとCSSをインライン展開した配布物)で、
+直接編集しても `npm run build` で上書きされます。編集するのは `src/index.html`
+(開発用エントリ、`type="module"` で `src/` を読む)のほうです。
 
 ## 適用範囲と制限
 

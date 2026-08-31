@@ -118,8 +118,8 @@ export function checkSections(geo, ana) {
   for (const key of ['top', 'bottom', 'left', 'right']) {
     const m = geo.memberMap[key];
     add(key, `${m.name} 支間中央`, m.length / 2, 'span');
-    add(key, `${m.name} 端部(始端ハンチ端)`, m.haunchEnd1, 'end');
-    add(key, `${m.name} 端部(終端ハンチ端)`, m.haunchEnd2, 'end');
+    add(key, `${m.name} ハンチ端(始)`, m.haunchEnd1, 'end');
+    add(key, `${m.name} ハンチ端(終)`, m.haunchEnd2, 'end');
   }
   return out;
 }

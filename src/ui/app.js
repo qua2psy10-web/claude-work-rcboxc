@@ -2,7 +2,7 @@
  * 画面の組み立てと再計算
  */
 
-import { design, defaultInput } from '../core/design.js';
+import { design, defaultInput, normalizeInput } from '../core/design.js';
 import { sectionSVG, loadSVG, diagramSVG, reactionSVG } from './draw.js';
 import { buildReport } from './report.js';
 
@@ -13,6 +13,15 @@ const num = (v, digits = 2) =>
 
 /** 入力欄の定義。path は入力オブジェクトのキー経路。 */
 const FIELDS = [
+  {
+    group: '工事情報', items: [
+      { path: 'project.name', label: '工事名', type: 'text' },
+      { path: 'project.section', label: '工区名', type: 'text' },
+      { path: 'project.designer', label: '設計者', type: 'text' },
+      { path: 'project.date', label: '作成日', type: 'text', help: '空欄なら計算書生成時の日付' },
+      { path: 'project.code', label: '製品No. / 型式', type: 'text' },
+    ],
+  },
   {
     group: '形状(mm)', open: true, items: [
       { path: 'dims.clearWidth', label: '内空幅 B', step: 50 },
@@ -28,7 +37,8 @@ const FIELDS = [
   },
   {
     group: '土質・土被り', open: true, items: [
-      { path: 'soil.cover', label: '土被り', unit: 'm', step: 0.1 },
+      { path: 'soil.coverMin', label: '土被り H1(最小)', unit: 'm', step: 0.1 },
+      { path: 'soil.coverMax', label: '土被り H2(最大)', unit: 'm', step: 0.1, help: 'H1 と同じ値にするとケースを畳む' },
       { path: 'soil.gamma', label: '単位体積重量 γ', unit: 'kN/m³', step: 0.5 },
       { path: 'soil.gammaSat', label: '飽和単位体積重量 γsat', unit: 'kN/m³', step: 0.5 },
       { path: 'soil.K0', label: '静止土圧係数 K0', step: 0.05 },
@@ -47,6 +57,7 @@ const FIELDS = [
       { path: 'live.wheelSpacing', label: '左右輪の間隔', unit: 'm', step: 0.05 },
       { path: 'live.tanTheta', label: '分布角 tanθ', step: 0.1, help: '1.0 で 45°' },
       { path: 'live.impact', label: '衝撃係数 i', step: 0.05, nullable: true, help: '空欄で土被りから自動算定' },
+      { path: 'live.surcharge', label: '側載時の上載荷重 Q', unit: 'kN/m²', step: 1, help: '群集荷重。側載ケースで側方土圧に加算' },
     ],
   },
   {
@@ -91,13 +102,14 @@ const setPath = (obj, path, value) => {
 let input = defaultInput();
 let current = null;
 let activeTab = 'section';
+let activeCase = 1;
 
 function loadStored() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const saved = JSON.parse(raw);
-    input = mergeInput(defaultInput(), saved);
+    input = normalizeInput(mergeInput(defaultInput(), saved));
   } catch { /* 保存値が壊れている場合は既定値のまま */ }
 }
 
@@ -133,7 +145,8 @@ function buildForm() {
     if (!el.dataset.path) return;
     const f = allFields().find((x) => x.path === el.dataset.path);
     let v;
-    if (f.type === 'checkbox') v = el.checked;
+    if (f.type === 'text') v = el.value;
+    else if (f.type === 'checkbox') v = el.checked;
     else if (f.type === 'select') v = Number.isNaN(Number(el.value)) ? el.value : Number(el.value);
     else if (el.value.trim() === '') v = f.nullable ? null : NaN;
     else v = Number(el.value);
@@ -154,6 +167,10 @@ function fieldHTML(f) {
       <input type="checkbox" id="${id}" data-path="${f.path}" ${v ? 'checked' : ''}>
       <span>${f.label}</span>${help}</label>`;
   }
+  if (f.type === 'text') {
+    return `<label class="field" for="${id}"><span>${f.label}</span>
+      <input type="text" id="${id}" data-path="${f.path}" value="${String(v ?? '').replace(/"/g, '&quot;')}">${help}</label>`;
+  }
   if (f.type === 'select') {
     return `<label class="field" for="${id}"><span>${f.label}${f.unit ? ` <em>${f.unit}</em>` : ''}</span>
       <select id="${id}" data-path="${f.path}">
@@ -171,6 +188,7 @@ function syncForm() {
     if (!el) continue;
     const v = getPath(input, f.path);
     if (f.type === 'checkbox') el.checked = !!v;
+    else if (f.type === 'text') el.value = v ?? '';
     else el.value = v === null || v === undefined || Number.isNaN(v) ? '' : v;
   }
 }
@@ -187,6 +205,7 @@ function recalc() {
     return;
   }
   current = out;
+  if (!out.cases.some((c) => c.id === activeCase)) activeCase = out.governingCase;
   banner.innerHTML = renderVerdict(out) + renderWarnings(out);
   renderFigure();
   document.getElementById('results').innerHTML = renderResults(out);
@@ -221,13 +240,27 @@ function renderFigure() {
   if (!current) { host.innerHTML = ''; return; }
   const tabs = TABS.map(([k, l]) =>
     `<button class="tab ${k === activeTab ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('');
+
+  // 断面図以外は荷重ケースごとに変わるので、ケース選択を出す
+  const caseBar = activeTab === 'section' ? '' : `<div class="tabs cases">${
+    current.cases.map((c) => `<button class="tab case ${c.id === activeCase ? 'active' : ''}"
+      data-case="${c.id}" title="${c.label}">CASE-${c.id}${
+      c.id === current.governingCase ? ' ★' : ''}</button>`).join('')
+  }<span class="casenote">${
+    esc(current.cases.find((c) => c.id === activeCase)?.label ?? '')}</span></div>`;
+
+  const c = current.cases.find((x) => x.id === activeCase) || current.cases[0];
+  const view = { ...current, loads: c.loads, ana: c.ana };
   let svg = '';
   if (activeTab === 'section') svg = sectionSVG(current);
-  else if (activeTab === 'load') svg = loadSVG(current);
-  else if (activeTab === 'react') svg = reactionSVG(current, 520, 300);
-  else svg = diagramSVG(current, activeTab);
-  host.innerHTML = `<div class="tabs">${tabs}</div><div class="figwrap">${svg}</div>`;
+  else if (activeTab === 'load') svg = loadSVG(view);
+  else if (activeTab === 'react') svg = reactionSVG(view, 520, 300);
+  else svg = diagramSVG(view, activeTab);
+  host.innerHTML = `<div class="tabs">${tabs}</div>${caseBar}<div class="figwrap">${svg}</div>`;
 }
+
+const esc = (v) => String(v).replace(/[&<>"]/g, (ch) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
 function renderResults(r) {
   const badge = (ok) => `<span class="badge ${ok ? 'ok' : 'ng'}">${ok ? 'OK' : 'NG'}</span>`;
@@ -236,32 +269,48 @@ function renderResults(r) {
     return `<td class="${c.ok ? '' : 'bad'}">${num(c.value, d)} / ${num(c.allow, d)}<br><small>${num(c.ratio, 2)}</small></td>`;
   };
 
+  const caseList = `
+  <h3>荷重ケース</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>ケース</th><th>載荷位置</th><th>土被り</th><th>地下水</th><th>最大 |M|<br><small>kN·m/m</small></th></tr></thead>
+    <tbody>${r.cases.map((c) => `<tr class="${c.id === r.governingCase ? 'gov' : ''}">
+      <td>CASE-${c.id}${c.id === r.governingCase ? ' ★' : ''}</td>
+      <td>${c.modeLabel}</td><td>${num(c.cover, 3)} m</td>
+      <td>${c.water ? '影響あり' : '影響なし'}</td>
+      <td>${num(Math.max(...c.sections.map((x) => Math.abs(x.M))), 1)}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+
   const sections = `
-  <h3>断面照査</h3>
+  <h3>断面照査(全ケースの包絡)</h3>
   <div class="tablewrap"><table>
     <thead><tr>
-      <th>照査断面</th><th>引張側</th><th>M<br><small>kN·m/m</small></th><th>S<br><small>kN/m</small></th>
+      <th>照査断面</th><th>引張側</th><th>M<br><small>kN·m/m</small></th><th>N<br><small>kN/m</small></th>
+      <th>Ms<br><small>kN·m/m</small></th><th>CASE</th>
       <th>配筋</th><th>σc / σca</th><th>σs / σsa</th><th>τm / τa1</th><th>判定</th>
     </tr></thead>
     <tbody>${r.sections.map((s) => `<tr>
       <td>${s.label}</td>
-      <td>${s.tensionSide === 'inner' ? '内側' : '外側'}</td>
-      <td>${num(s.M, 1)}</td><td>${num(Math.abs(s.S), 1)}</td>
+      <td>${s.face === 'inner' ? '内側' : '外側'}</td>
+      <td>${num(s.M, 1)}</td><td>${num(s.N, 1)}</td><td>${num(s.check.Ms, 1)}</td>
+      <td>CASE-${s.caseId}</td>
       <td>${s.rebar ? s.rebar.label : '—'}</td>
       ${cell(s.check.checks.concrete)}${cell(s.check.checks.steel)}${cell(s.check.checks.shear)}
       <td>${badge(s.check.ok)}</td></tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div>
+  <p class="note">Ms ＝ M + N·c は軸力を考慮した曲げモーメント(引張鉄筋まわり)。
+     CASE 列は断面力を抽出した荷重ケースを示す。</p>`;
 
   const plan = `
   <h3>配筋(主鉄筋)</h3>
   <div class="tablewrap"><table>
     <thead><tr><th>部材</th><th>面</th><th>設計 M<br><small>kN·m/m</small></th><th>必要 As<br><small>mm²/m</small></th>
-      <th>最小 As</th><th>採用</th><th>配置 As</th><th>備考</th></tr></thead>
+      <th>最小 As</th><th>採用</th><th>配置 As</th><th>CASE</th><th>備考</th></tr></thead>
     <tbody>${r.rebarPlan.map((p) => `<tr>
       <td>${p.memberName}</td><td>${p.faceLabel}</td>
       <td>${num(p.M, 1)}</td><td>${num(p.asRequired, 0)}</td><td>${num(p.asMinimum, 0)}</td>
       <td>${p.selected ? p.selected.label : '<span class="bad">候補なし</span>'}</td>
       <td>${p.selected ? num(p.selected.As, 0) : '—'}</td>
+      <td>${p.caseId ? `CASE-${p.caseId}` : '—'}</td>
       <td>${p.governedByMinimum ? '最小鉄筋量で決定' : ''}${p.sectionAdequate ? '' : ' 断面不足'}</td>
     </tr>`).join('')}</tbody>
   </table></div>
@@ -271,32 +320,34 @@ function renderResults(r) {
   const stability = `
   <h3>安定・基礎の検討</h3>
   <div class="tablewrap"><table>
-    <thead><tr><th>照査項目</th><th>内容</th><th>判定</th></tr></thead>
+    <thead><tr><th>照査項目</th><th>内容</th><th>支配CASE</th><th>判定</th></tr></thead>
     <tbody>${r.stability.items.map((i) => `<tr>
-      <td>${i.label}</td><td>${i.text}</td><td>${badge(i.ok)}</td></tr>`).join('')}</tbody>
+      <td>${i.label}</td><td>${i.text}</td><td>CASE-${i.caseId}</td><td>${badge(i.ok)}</td></tr>`).join('')}</tbody>
   </table></div>
   <p class="note">鉛直方向の釣合い検算: 載荷重 ${num(r.stability.balance.applied)} kN/m,
      底版反力 ${num(r.stability.balance.reaction)} kN/m(差 ${num(r.stability.balance.error, 6)})</p>`;
 
+  const shown = r.cases.find((c) => c.id === activeCase) || r.cases[0];
+  const sm = shown.loads.summary;
   const loadsInfo = `
-  <h3>荷重の算定</h3>
+  <h3>荷重の算定(CASE-${shown.id}: ${shown.label})</h3>
   <div class="tablewrap"><table>
     <tbody>
-      <tr><th>躯体自重</th><td>${num(r.loads.summary.selfWeight)} kN/m</td></tr>
-      <tr><th>頂版上面の鉛直土圧</th><td>${num(r.loads.summary.earthTop)} kN/m²
-        (α=${num(r.loads.summary.alpha)})</td></tr>
-      <tr><th>活荷重による鉛直土圧</th><td>${num(r.loads.summary.live.q)} kN/m²
-        (i=${num(r.loads.summary.live.impact, 3)}、分布 ${num(r.loads.summary.live.La)}×${num(r.loads.summary.live.Lb)} m)</td></tr>
-      <tr><th>頂版の鉛直荷重</th><td>${num(r.loads.summary.qTop)} kN/m²</td></tr>
-      <tr><th>側方土圧(上端 / 下端)</th><td>左 ${num(r.loads.summary.lateralTopLeft)} / ${num(r.loads.summary.lateralBottomLeft)} kN/m²、
-        右 ${num(r.loads.summary.lateralTopRight)} / ${num(r.loads.summary.lateralBottomRight)} kN/m²</td></tr>
-      <tr><th>底版下面の揚圧力</th><td>${num(r.loads.summary.uBottom)} kN/m²</td></tr>
+      <tr><th>躯体自重</th><td>${num(sm.selfWeight)} kN/m</td></tr>
+      <tr><th>頂版上面の鉛直土圧</th><td>${num(sm.earthTop)} kN/m² (α=${num(sm.alpha)})</td></tr>
+      <tr><th>活荷重による鉛直土圧</th><td>${sm.liveMode === 'top'
+        ? `${num(sm.live.q)} kN/m² (i=${num(sm.live.impact, 3)}、分布 ${num(sm.live.La)}×${num(sm.live.Lb)} m)`
+        : `側載のため頂版には載らない(側方の上載荷重 Q=${num(sm.surcharge)} kN/m²)`}</td></tr>
+      <tr><th>頂版の鉛直荷重</th><td>${num(sm.qTop)} kN/m²</td></tr>
+      <tr><th>側方土圧(上端 / 下端)</th><td>左 ${num(sm.lateralTopLeft)} / ${num(sm.lateralBottomLeft)} kN/m²、
+        右 ${num(sm.lateralTopRight)} / ${num(sm.lateralBottomRight)} kN/m²</td></tr>
+      <tr><th>底版下面の揚圧力</th><td>${num(sm.uBottom)} kN/m²</td></tr>
       <tr><th>許容応力度</th><td>σca=${num(r.allow.sigmaCa)}、σsa=${num(r.allow.sigmaSa)}、
         τa1=${num(r.allow.tauA1, 3)} N/mm²</td></tr>
     </tbody>
   </table></div>`;
 
-  return sections + plan + stability + loadsInfo;
+  return caseList + sections + plan + stability + loadsInfo;
 }
 
 function download(name, text, type = 'application/json') {
@@ -311,6 +362,13 @@ function download(name, text, type = 'application/json') {
 
 function wireActions() {
   document.getElementById('figure').addEventListener('click', (ev) => {
+    const c = ev.target.closest('[data-case]');
+    if (c) {
+      activeCase = Number(c.dataset.case);
+      renderFigure();
+      document.getElementById('results').innerHTML = renderResults(current);
+      return;
+    }
     const t = ev.target.closest('[data-tab]');
     if (!t) return;
     activeTab = t.dataset.tab;
@@ -327,7 +385,7 @@ function wireActions() {
     const f = ev.target.files[0];
     if (!f) return;
     try {
-      input = mergeInput(defaultInput(), JSON.parse(await f.text()));
+      input = normalizeInput(mergeInput(defaultInput(), JSON.parse(await f.text())));
       store(); syncForm(); recalc();
     } catch (e) {
       alert(`読み込みに失敗しました: ${e.message}`);

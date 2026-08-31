@@ -16,19 +16,23 @@ test('衝撃係数: 土被りによる区分', () => {
   close(impactFactor(10), 0, 1e-12, 'h=10');
 });
 
-test('活荷重: 分布幅と圧力が手計算と一致する(土被り1.0m)', () => {
-  const r = liveLoadPressure(1.0);
-  // La = 0.2 + 2*1.0*1.0 = 2.2 / 1輪の分布幅 Lb0 = 0.5 + 2.0 = 2.5 > 1.75 → 重なる
-  close(r.La, 2.2, 1e-12, '進行方向の分布長');
-  close(r.Lb, 1.75 + 2.5, 1e-12, '直角方向の合成分布幅');
-  assert.equal(r.overlap, true);
-  close(r.q, (2 * 100 * 1.5) / (2.2 * 4.25), 1e-9, '活荷重圧');
+test('活荷重: 参照帳票と同条件で分布幅・輪荷重・鉛直土圧が一致する', () => {
+  // 帳票の値: a=0.20 b=0.50 H=0.200 i=0.300 β=0.9 P=100 → u=0.600 v=0.900
+  //           Pl=117.000 kN、Pvl=141.818 kN/m2
+  const r = liveLoadPressure(0.2, { impact: 0.3, beta: 0.9 });
+  close(r.u, 0.6, 1e-12, '輪分布幅 u = a + 2H·tanθ');
+  close(r.v, 0.9, 1e-12, '輪分布幅 v = b + 2H·tanθ');
+  close(r.Pl, 117.0, 1e-9, '活荷重 Pl = P(1+i)β');
+  close(r.q, (2 * 117.0) / 2.75 / 0.6, 1e-9, '鉛直土圧 Pvl = 2Pl/W/u');
+  close(r.q, 141.818, 1e-3, '帳票の Pvl');
 });
 
-test('活荷重: 分布幅が重ならない浅い土被り', () => {
-  const r = liveLoadPressure(0.5);
-  close(r.Lb, 2 * (0.5 + 1.0), 1e-12, '重ならない場合は2輪分の幅');
-  assert.ok(r.note.includes('0.5m 未満') === false);
+test('活荷重: 断面力低減係数と占有幅が効く', () => {
+  const base = liveLoadPressure(1.0, { impact: 0.5, beta: 1.0 });
+  const withBeta = liveLoadPressure(1.0, { impact: 0.5, beta: 0.9 });
+  close(withBeta.q, base.q * 0.9, 1e-9, 'β に比例して低減される');
+  const wide = liveLoadPressure(1.0, { impact: 0.5, occupancyWidth: 5.5 });
+  close(wide.q, base.q / 2, 1e-9, '占有幅に反比例する');
 });
 
 test('土中応力: 地下水位を挟んだ全応力・水圧・側方応力', () => {
@@ -45,24 +49,41 @@ test('土中応力: 地下水位を挟んだ全応力・水圧・側方応力', 
 
 test('荷重算定: 頂版荷重と側壁土圧が手計算と一致する', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin; // 1ケース分の条件に落とす
+  input.live.mode = 'top';
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
   const { summary } = buildLoads(geo, input);
 
   close(summary.earthTop, 19 * 1.0, 1e-9, '頂版上面の鉛直土圧 γ·h');
   close(summary.qTop, 19 + summary.live.q, 1e-9, '頂版の鉛直荷重');
 
-  // 頂版中心線の深さ = 土被り + 頂版厚/2 = 1.0 + 0.15
+  // 上載ケースでは側方に活荷重ぶんの上載荷重を考慮しない(側載ケースで考慮する)
   const zTopAxis = 1.0 + 0.15;
-  const expectTop = 0.5 * 19 * zTopAxis + 0.5 * summary.live.q;
-  close(summary.lateralTopLeft, expectTop, 1e-9, '側壁上端の側方土圧');
+  close(summary.lateralTopLeft, 0.5 * 19 * zTopAxis, 1e-9, '側壁上端の側方土圧');
 
   // 底版中心線の深さ = 1.0 + 外形高 - 底版厚/2
   const zBotAxis = 1.0 + geo.outerH - 0.15;
-  close(summary.lateralBottomLeft, 0.5 * 19 * zBotAxis + 0.5 * summary.live.q, 1e-9, '側壁下端の側方土圧');
+  close(summary.lateralBottomLeft, 0.5 * 19 * zBotAxis, 1e-9, '側壁下端の側方土圧');
+});
+
+test('荷重算定: 側載では鉛直活荷重が載らず、側方に上載荷重が加わる', () => {
+  const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'side';
+  input.live.surcharge = 10;
+  const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
+  const { summary } = buildLoads(geo, input);
+
+  close(summary.qTop, 19 * 1.0, 1e-9, '頂版には土圧のみが載る');
+  close(summary.live.q, 0, 1e-12, '鉛直活荷重はゼロ');
+  const zTopAxis = 1.0 + 0.15;
+  close(summary.lateralTopLeft, 0.5 * 19 * zTopAxis + 0.5 * 10, 1e-9, '側方に上載荷重 K·Q が加わる');
 });
 
 test('荷重算定: 地下水位以下では揚圧力と浮力が計上される', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'top';
   input.soil.waterLevel = 0.5; // GL-0.5m
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
   const { summary } = buildLoads(geo, input);
@@ -74,6 +95,8 @@ test('荷重算定: 地下水位以下では揚圧力と浮力が計上される
 
 test('荷重算定: 自重が実断面から求めた重量と整合する', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'top';
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 24 });
   const { summary } = buildLoads(geo, input);
   close(summary.selfWeight, geo.selfWeight, 1e-6, '自重の合計');

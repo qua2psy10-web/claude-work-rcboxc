@@ -132,6 +132,9 @@ svg.fig .diag.react { fill: rgba(21, 128, 61, .18); stroke: #15803d; }
 h3 { font-size: 14px; margin: 16px 0 6px; color: #25405c; }
 h3:first-child { margin-top: 2px; }
 .tablewrap { overflow-x: auto; }
+/* 列を潰さず、収まらない場合は横スクロールさせる */
+.tablewrap table { width: auto; min-width: 100%; }
+.tablewrap th, .tablewrap td { white-space: nowrap; }
 table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: right; }
 th { background: #eef2f7; font-weight: 600; text-align: center; }
@@ -145,24 +148,75 @@ p.note { font-size: 12px; color: var(--muted); }
 
 /* ---- 計算書(印刷) ---- */
 #report { display: none; }
-.report h1 { font-size: 19px; margin: 0 0 4px; }
-.report h2 { font-size: 15px; border-bottom: 1.5px solid #25405c; padding-bottom: 3px; margin: 20px 0 8px; }
-.report h3 { font-size: 13px; margin: 12px 0 4px; }
-.report .rp-head { border-bottom: 2px solid #25405c; padding-bottom: 8px; margin-bottom: 12px; }
-.report .rp-meta { font-size: 12px; color: var(--muted); }
-.report .formula { background: #f4f6f9; border-left: 3px solid #8ea0b4; padding: 5px 10px; margin: 5px 0; }
-.report .figrow { display: flex; gap: 10px; flex-wrap: wrap; }
-.report .figrow svg { width: 48%; min-width: 260px; }
-.report table.rp { margin: 6px 0 10px; }
-.report .rp-foot { margin-top: 22px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 6px; }
+.report { font-size: 12px; line-height: 1.7; }
+.report h1 { font-size: 26px; margin: 0 0 10px; letter-spacing: .18em; }
+.report h2 {
+  font-size: 15px; border-bottom: 1.5px solid #25405c;
+  padding-bottom: 3px; margin: 0 0 10px;
+}
+.report h3 { font-size: 13px; margin: 14px 0 5px; color: #25405c; }
+.report .chapter { margin-bottom: 26px; }
+.report .formula {
+  background: #f4f6f9; border-left: 3px solid #8ea0b4;
+  padding: 5px 10px; margin: 5px 0;
+}
+.report .figrow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.report .figrow svg { width: 48%; min-width: 240px; }
+.report .figrow:only-child svg, .report .cover .figrow svg { width: 60%; }
+.report .rp-foot {
+  margin-top: 22px; font-size: 11px; color: var(--muted);
+  border-top: 1px solid var(--line); padding-top: 6px;
+}
+.report .ok { color: var(--ok); }
+.report .ng { color: var(--ng); }
+
+/* 表紙 */
+.report .cover { text-align: center; padding: 24px 0 0; margin-bottom: 26px; }
+.report .cover-code { text-align: right; font-size: 12px; color: var(--muted); }
+.report .cover-sub { color: var(--muted); margin: 0 0 22px; }
+.report .cover-box { display: inline-block; text-align: left; margin: 0 auto 18px; }
+.report .cover-verdict { font-size: 16px; font-weight: 700; letter-spacing: .1em; }
+.report .cover-verdict.ok { color: var(--ok); }
+.report .cover-verdict.ng { color: var(--ng); }
+
+/* 表 */
+table.rp { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 11.5px; }
+table.rp th, table.rp td { border: 1px solid var(--line); padding: 3px 6px; }
+table.rp th { background: #eef2f7; text-align: center; font-weight: 600; }
+table.rp.num td { text-align: right; }
+table.rp.num td:nth-child(1), table.rp.num td:nth-child(2) { text-align: left; }
+table.rp.meta { width: auto; margin: 0 auto 14px; }
+table.rp.meta td:first-child { background: #eef2f7; font-weight: 600; }
+
+/* 「記号 ＝ 値 [単位]」の整列 */
+table.rp.def { width: auto; border: 0; }
+table.rp.def td { border: 0; padding: 1px 5px; }
+table.rp.def .lbl { text-align: left; min-width: 12em; }
+table.rp.def .sym { text-align: left; white-space: nowrap; }
+table.rp.def .eq { text-align: center; }
+table.rp.def .val { text-align: right; font-variant-numeric: tabular-nums; min-width: 5em; }
+table.rp.def .unit { text-align: left; color: var(--muted); }
+
+/* 各ページに繰り返すヘッダ */
+.print-header { display: none; }
 
 @media print {
-  body { background: #fff; font-size: 10.5px; }
+  body { background: #fff; }
   header.app, main { display: none !important; }
   #report { display: block; padding: 0; }
-  .report h2 { break-after: avoid; }
-  table, .figrow { break-inside: avoid; }
-  @page { size: A4; margin: 14mm; }
+  .print-header {
+    display: block; position: fixed; top: 0; left: 0; right: 0;
+    font-size: 10px; color: #33465c; border-bottom: .5px solid #b9c5d2;
+    padding-bottom: 2px; display: flex; justify-content: space-between;
+  }
+  .report { padding-top: 14px; }
+  /* 章の頭でページを送る。表紙の直後も同様。 */
+  .report .chapter { break-before: page; }
+  .report .cover { break-after: page; margin-bottom: 0; }
+  .report h2, .report h3 { break-after: avoid; }
+  table.rp, .figrow { break-inside: avoid; }
+  tr { break-inside: avoid; }
+  @page { size: A4 portrait; margin: 16mm 14mm; }
 }
 
 </style>
@@ -212,7 +266,7 @@ __define("ui/app", function () {
  * 画面の組み立てと再計算
  */
 
-const {design, defaultInput} = __require("core/design");
+const {design, defaultInput, normalizeInput} = __require("core/design");
 const {sectionSVG, loadSVG, diagramSVG, reactionSVG} = __require("ui/draw");
 const {buildReport} = __require("ui/report");
 
@@ -223,6 +277,15 @@ const num = (v, digits = 2) =>
 
 /** 入力欄の定義。path は入力オブジェクトのキー経路。 */
 const FIELDS = [
+  {
+    group: '工事情報', items: [
+      { path: 'project.name', label: '工事名', type: 'text' },
+      { path: 'project.section', label: '工区名', type: 'text' },
+      { path: 'project.designer', label: '設計者', type: 'text' },
+      { path: 'project.date', label: '作成日', type: 'text', help: '空欄なら計算書生成時の日付' },
+      { path: 'project.code', label: '製品No. / 型式', type: 'text' },
+    ],
+  },
   {
     group: '形状(mm)', open: true, items: [
       { path: 'dims.clearWidth', label: '内空幅 B', step: 50 },
@@ -238,7 +301,8 @@ const FIELDS = [
   },
   {
     group: '土質・土被り', open: true, items: [
-      { path: 'soil.cover', label: '土被り', unit: 'm', step: 0.1 },
+      { path: 'soil.coverMin', label: '土被り H1(最小)', unit: 'm', step: 0.1 },
+      { path: 'soil.coverMax', label: '土被り H2(最大)', unit: 'm', step: 0.1, help: 'H1 と同じ値にするとケースを畳む' },
       { path: 'soil.gamma', label: '単位体積重量 γ', unit: 'kN/m³', step: 0.5 },
       { path: 'soil.gammaSat', label: '飽和単位体積重量 γsat', unit: 'kN/m³', step: 0.5 },
       { path: 'soil.K0', label: '静止土圧係数 K0', step: 0.05 },
@@ -254,9 +318,11 @@ const FIELDS = [
       { path: 'live.wheelLoad', label: '後輪1輪の荷重 P', unit: 'kN', step: 5 },
       { path: 'live.contactA', label: '接地長 a(進行方向)', unit: 'm', step: 0.05 },
       { path: 'live.contactB', label: '接地幅 b(直角方向)', unit: 'm', step: 0.05 },
-      { path: 'live.wheelSpacing', label: '左右輪の間隔', unit: 'm', step: 0.05 },
+      { path: 'live.occupancyWidth', label: '車両の占有幅 W', unit: 'm', step: 0.05 },
+      { path: 'live.beta', label: '断面力低減係数 β', step: 0.05 },
       { path: 'live.tanTheta', label: '分布角 tanθ', step: 0.1, help: '1.0 で 45°' },
       { path: 'live.impact', label: '衝撃係数 i', step: 0.05, nullable: true, help: '空欄で土被りから自動算定' },
+      { path: 'live.surcharge', label: '側載時の上載荷重 Q', unit: 'kN/m²', step: 1, help: '群集荷重。側載ケースで側方土圧に加算' },
     ],
   },
   {
@@ -301,13 +367,14 @@ const setPath = (obj, path, value) => {
 let input = defaultInput();
 let current = null;
 let activeTab = 'section';
+let activeCase = 1;
 
 function loadStored() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const saved = JSON.parse(raw);
-    input = mergeInput(defaultInput(), saved);
+    input = normalizeInput(mergeInput(defaultInput(), saved));
   } catch { /* 保存値が壊れている場合は既定値のまま */ }
 }
 
@@ -343,7 +410,8 @@ function buildForm() {
     if (!el.dataset.path) return;
     const f = allFields().find((x) => x.path === el.dataset.path);
     let v;
-    if (f.type === 'checkbox') v = el.checked;
+    if (f.type === 'text') v = el.value;
+    else if (f.type === 'checkbox') v = el.checked;
     else if (f.type === 'select') v = Number.isNaN(Number(el.value)) ? el.value : Number(el.value);
     else if (el.value.trim() === '') v = f.nullable ? null : NaN;
     else v = Number(el.value);
@@ -364,6 +432,10 @@ function fieldHTML(f) {
       <input type="checkbox" id="${id}" data-path="${f.path}" ${v ? 'checked' : ''}>
       <span>${f.label}</span>${help}</label>`;
   }
+  if (f.type === 'text') {
+    return `<label class="field" for="${id}"><span>${f.label}</span>
+      <input type="text" id="${id}" data-path="${f.path}" value="${String(v ?? '').replace(/"/g, '&quot;')}">${help}</label>`;
+  }
   if (f.type === 'select') {
     return `<label class="field" for="${id}"><span>${f.label}${f.unit ? ` <em>${f.unit}</em>` : ''}</span>
       <select id="${id}" data-path="${f.path}">
@@ -381,6 +453,7 @@ function syncForm() {
     if (!el) continue;
     const v = getPath(input, f.path);
     if (f.type === 'checkbox') el.checked = !!v;
+    else if (f.type === 'text') el.value = v ?? '';
     else el.value = v === null || v === undefined || Number.isNaN(v) ? '' : v;
   }
 }
@@ -397,6 +470,7 @@ function recalc() {
     return;
   }
   current = out;
+  if (!out.cases.some((c) => c.id === activeCase)) activeCase = out.governingCase;
   banner.innerHTML = renderVerdict(out) + renderWarnings(out);
   renderFigure();
   document.getElementById('results').innerHTML = renderResults(out);
@@ -431,13 +505,27 @@ function renderFigure() {
   if (!current) { host.innerHTML = ''; return; }
   const tabs = TABS.map(([k, l]) =>
     `<button class="tab ${k === activeTab ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('');
+
+  // 断面図以外は荷重ケースごとに変わるので、ケース選択を出す
+  const caseBar = activeTab === 'section' ? '' : `<div class="tabs cases">${
+    current.cases.map((c) => `<button class="tab case ${c.id === activeCase ? 'active' : ''}"
+      data-case="${c.id}" title="${c.label}">CASE-${c.id}${
+      c.id === current.governingCase ? ' ★' : ''}</button>`).join('')
+  }<span class="casenote">${
+    esc(current.cases.find((c) => c.id === activeCase)?.label ?? '')}</span></div>`;
+
+  const c = current.cases.find((x) => x.id === activeCase) || current.cases[0];
+  const view = { ...current, loads: c.loads, ana: c.ana };
   let svg = '';
   if (activeTab === 'section') svg = sectionSVG(current);
-  else if (activeTab === 'load') svg = loadSVG(current);
-  else if (activeTab === 'react') svg = reactionSVG(current, 520, 300);
-  else svg = diagramSVG(current, activeTab);
-  host.innerHTML = `<div class="tabs">${tabs}</div><div class="figwrap">${svg}</div>`;
+  else if (activeTab === 'load') svg = loadSVG(view);
+  else if (activeTab === 'react') svg = reactionSVG(view, 520, 300);
+  else svg = diagramSVG(view, activeTab);
+  host.innerHTML = `<div class="tabs">${tabs}</div>${caseBar}<div class="figwrap">${svg}</div>`;
 }
+
+const esc = (v) => String(v).replace(/[&<>"]/g, (ch) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
 function renderResults(r) {
   const badge = (ok) => `<span class="badge ${ok ? 'ok' : 'ng'}">${ok ? 'OK' : 'NG'}</span>`;
@@ -446,32 +534,67 @@ function renderResults(r) {
     return `<td class="${c.ok ? '' : 'bad'}">${num(c.value, d)} / ${num(c.allow, d)}<br><small>${num(c.ratio, 2)}</small></td>`;
   };
 
+  const caseList = `
+  <h3>荷重ケース</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>ケース</th><th>載荷位置</th><th>土被り</th><th>地下水</th><th>最大 |M|<br><small>kN·m/m</small></th></tr></thead>
+    <tbody>${r.cases.map((c) => `<tr class="${c.id === r.governingCase ? 'gov' : ''}">
+      <td>CASE-${c.id}${c.id === r.governingCase ? ' ★' : ''}</td>
+      <td>${c.modeLabel}</td><td>${num(c.cover, 3)} m</td>
+      <td>${c.water ? '影響あり' : '影響なし'}</td>
+      <td>${num(Math.max(...c.sections.map((x) => Math.abs(x.M))), 1)}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+
   const sections = `
-  <h3>断面照査</h3>
+  <h3>断面照査(全ケースの包絡)</h3>
   <div class="tablewrap"><table>
     <thead><tr>
-      <th>照査断面</th><th>引張側</th><th>M<br><small>kN·m/m</small></th><th>S<br><small>kN/m</small></th>
-      <th>配筋</th><th>σc / σca</th><th>σs / σsa</th><th>τm / τa1</th><th>判定</th>
+      <th>照査断面</th><th>引張側</th><th>M<br><small>kN·m/m</small></th><th>N<br><small>kN/m</small></th>
+      <th>Ms<br><small>kN·m/m</small></th><th>CASE</th>
+      <th>配筋</th><th>σc / σca</th><th>σs / σsa</th><th>判定</th>
     </tr></thead>
     <tbody>${r.sections.map((s) => `<tr>
       <td>${s.label}</td>
-      <td>${s.tensionSide === 'inner' ? '内側' : '外側'}</td>
-      <td>${num(s.M, 1)}</td><td>${num(Math.abs(s.S), 1)}</td>
+      <td>${s.face === 'inner' ? '内側' : '外側'}</td>
+      <td>${num(s.M, 1)}</td><td>${num(s.N, 1)}</td><td>${num(s.check.Ms, 1)}</td>
+      <td>CASE-${s.caseId}</td>
       <td>${s.rebar ? s.rebar.label : '—'}</td>
-      ${cell(s.check.checks.concrete)}${cell(s.check.checks.steel)}${cell(s.check.checks.shear)}
+      ${cell(s.check.checks.concrete)}${cell(s.check.checks.steel)}
       <td>${badge(s.check.ok)}</td></tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div>
+  <p class="note">Ms ＝ M + N·c は軸力を考慮した曲げモーメント(引張鉄筋まわり)。
+     CASE 列は断面力を抽出した荷重ケースを示す。</p>
+
+  <h3>せん断照査(τ点)</h3>
+  <div class="tablewrap"><table>
+    <thead><tr>
+      <th>照査断面</th><th>位置<br><small>m</small></th><th>S<br><small>kN/m</small></th><th>CASE</th>
+      <th>T<br><small>mm</small></th><th>C'<br><small>mm</small></th><th>h'<br><small>mm</small></th>
+      <th>配筋</th><th>τm / τa1</th><th>判定</th>
+    </tr></thead>
+    <tbody>${r.shear.map((t) => `<tr>
+      <td>${t.label}</td><td>${num(t.s, 3)}</td><td>${num(Math.abs(t.S), 1)}</td>
+      <td>CASE-${t.caseId}</td>
+      <td>${Math.round(t.T * 1000)}</td><td>${Math.round(t.haunch * 1000)}</td>
+      <td>${Math.round(t.hEff * 1000)}</td>
+      <td>${t.rebar ? t.rebar.label : '—'}</td>
+      ${cell(t.check.check)}
+      <td>${badge(t.check.ok)}</td></tr>`).join('')}</tbody>
+  </table></div>
+  <p class="note">照査位置は支点前面から T/2。ハンチ内にある場合は
+     h' ＝ T + C'/3 として断面高を割り増す(C' はその位置のハンチ高さ)。</p>`;
 
   const plan = `
   <h3>配筋(主鉄筋)</h3>
   <div class="tablewrap"><table>
     <thead><tr><th>部材</th><th>面</th><th>設計 M<br><small>kN·m/m</small></th><th>必要 As<br><small>mm²/m</small></th>
-      <th>最小 As</th><th>採用</th><th>配置 As</th><th>備考</th></tr></thead>
+      <th>最小 As</th><th>採用</th><th>配置 As</th><th>CASE</th><th>備考</th></tr></thead>
     <tbody>${r.rebarPlan.map((p) => `<tr>
       <td>${p.memberName}</td><td>${p.faceLabel}</td>
       <td>${num(p.M, 1)}</td><td>${num(p.asRequired, 0)}</td><td>${num(p.asMinimum, 0)}</td>
       <td>${p.selected ? p.selected.label : '<span class="bad">候補なし</span>'}</td>
       <td>${p.selected ? num(p.selected.As, 0) : '—'}</td>
+      <td>${p.caseId ? `CASE-${p.caseId}` : '—'}</td>
       <td>${p.governedByMinimum ? '最小鉄筋量で決定' : ''}${p.sectionAdequate ? '' : ' 断面不足'}</td>
     </tr>`).join('')}</tbody>
   </table></div>
@@ -481,32 +604,34 @@ function renderResults(r) {
   const stability = `
   <h3>安定・基礎の検討</h3>
   <div class="tablewrap"><table>
-    <thead><tr><th>照査項目</th><th>内容</th><th>判定</th></tr></thead>
+    <thead><tr><th>照査項目</th><th>内容</th><th>支配CASE</th><th>判定</th></tr></thead>
     <tbody>${r.stability.items.map((i) => `<tr>
-      <td>${i.label}</td><td>${i.text}</td><td>${badge(i.ok)}</td></tr>`).join('')}</tbody>
+      <td>${i.label}</td><td>${i.text}</td><td>CASE-${i.caseId}</td><td>${badge(i.ok)}</td></tr>`).join('')}</tbody>
   </table></div>
   <p class="note">鉛直方向の釣合い検算: 載荷重 ${num(r.stability.balance.applied)} kN/m,
      底版反力 ${num(r.stability.balance.reaction)} kN/m(差 ${num(r.stability.balance.error, 6)})</p>`;
 
+  const shown = r.cases.find((c) => c.id === activeCase) || r.cases[0];
+  const sm = shown.loads.summary;
   const loadsInfo = `
-  <h3>荷重の算定</h3>
+  <h3>荷重の算定(CASE-${shown.id}: ${shown.label})</h3>
   <div class="tablewrap"><table>
     <tbody>
-      <tr><th>躯体自重</th><td>${num(r.loads.summary.selfWeight)} kN/m</td></tr>
-      <tr><th>頂版上面の鉛直土圧</th><td>${num(r.loads.summary.earthTop)} kN/m²
-        (α=${num(r.loads.summary.alpha)})</td></tr>
-      <tr><th>活荷重による鉛直土圧</th><td>${num(r.loads.summary.live.q)} kN/m²
-        (i=${num(r.loads.summary.live.impact, 3)}、分布 ${num(r.loads.summary.live.La)}×${num(r.loads.summary.live.Lb)} m)</td></tr>
-      <tr><th>頂版の鉛直荷重</th><td>${num(r.loads.summary.qTop)} kN/m²</td></tr>
-      <tr><th>側方土圧(上端 / 下端)</th><td>左 ${num(r.loads.summary.lateralTopLeft)} / ${num(r.loads.summary.lateralBottomLeft)} kN/m²、
-        右 ${num(r.loads.summary.lateralTopRight)} / ${num(r.loads.summary.lateralBottomRight)} kN/m²</td></tr>
-      <tr><th>底版下面の揚圧力</th><td>${num(r.loads.summary.uBottom)} kN/m²</td></tr>
+      <tr><th>躯体自重</th><td>${num(sm.selfWeight)} kN/m</td></tr>
+      <tr><th>頂版上面の鉛直土圧</th><td>${num(sm.earthTop)} kN/m² (α=${num(sm.alpha)})</td></tr>
+      <tr><th>活荷重による鉛直土圧</th><td>${sm.liveMode === 'top'
+        ? `${num(sm.live.q)} kN/m² (i=${num(sm.live.impact, 3)}、β=${num(sm.live.beta, 2)}、u=${num(sm.live.u, 3)} m)`
+        : `側載のため頂版には載らない(側方の上載荷重 Q=${num(sm.surcharge)} kN/m²)`}</td></tr>
+      <tr><th>頂版の鉛直荷重</th><td>${num(sm.qTop)} kN/m²</td></tr>
+      <tr><th>側方土圧(上端 / 下端)</th><td>左 ${num(sm.lateralTopLeft)} / ${num(sm.lateralBottomLeft)} kN/m²、
+        右 ${num(sm.lateralTopRight)} / ${num(sm.lateralBottomRight)} kN/m²</td></tr>
+      <tr><th>底版下面の揚圧力</th><td>${num(sm.uBottom)} kN/m²</td></tr>
       <tr><th>許容応力度</th><td>σca=${num(r.allow.sigmaCa)}、σsa=${num(r.allow.sigmaSa)}、
         τa1=${num(r.allow.tauA1, 3)} N/mm²</td></tr>
     </tbody>
   </table></div>`;
 
-  return sections + plan + stability + loadsInfo;
+  return caseList + sections + plan + stability + loadsInfo;
 }
 
 function download(name, text, type = 'application/json') {
@@ -521,6 +646,13 @@ function download(name, text, type = 'application/json') {
 
 function wireActions() {
   document.getElementById('figure').addEventListener('click', (ev) => {
+    const c = ev.target.closest('[data-case]');
+    if (c) {
+      activeCase = Number(c.dataset.case);
+      renderFigure();
+      document.getElementById('results').innerHTML = renderResults(current);
+      return;
+    }
     const t = ev.target.closest('[data-tab]');
     if (!t) return;
     activeTab = t.dataset.tab;
@@ -537,7 +669,7 @@ function wireActions() {
     const f = ev.target.files[0];
     if (!f) return;
     try {
-      input = mergeInput(defaultInput(), JSON.parse(await f.text()));
+      input = normalizeInput(mergeInput(defaultInput(), JSON.parse(await f.text())));
       store(); syncForm(); recalc();
     } catch (e) {
       alert(`読み込みに失敗しました: ${e.message}`);
@@ -564,23 +696,42 @@ __define("core/design", function () {
 /**
  * 設計計算のエントリポイント
  *
- *   入力条件 → 形状 → 荷重 → 骨組解析 → 断面力 → 配筋設計 → 照査 → 安定検討
+ *   入力条件 → 形状 → 荷重ケースの生成 → ケースごとの骨組解析
+ *            → 断面力の包絡 → 配筋設計 → 応力度照査 → 安定検討
+ *
+ * 荷重ケースは実務の計算書にならい、次の3軸の組合せで生成する。
+ *   載荷位置  上載(荷重がカルバート直上) / 側載(荷重がカルバート側方)
+ *   土被り    H1(最小) / H2(最大)
+ *   地下水    影響なし / 影響あり
+ *
+ * 番号は次の順に振る(地下水を考慮しない場合は CASE-1〜4 のみ)。
+ *   CASE-1 上載 H1 水無   CASE-2 側載 H1 水無
+ *   CASE-3 上載 H2 水無   CASE-4 側載 H2 水無
+ *   CASE-5 上載 H1 水有   CASE-6 側載 H1 水有
+ *   CASE-7 上載 H2 水有   CASE-8 側載 H2 水有
  *
  * この関数は DOM に依存しない純粋な計算であり、テストから直接呼び出せる。
  */
 
 const {buildGeometry} = __require("core/geometry");
 const {buildLoads} = __require("core/loads");
-const {analyze, checkSections} = __require("core/analyze");
-const {checkSection, requiredAs, minimumAs, concreteCapacityMoment} = __require("core/rc");
+const {analyze, checkSections, shearSections} = __require("core/analyze");
+const {checkSection, checkShear, requiredAsAxial, minimumAs, concreteCapacityMoment} = __require("core/rc");
 const {selectRebar, distributionRebar, arrangement} = __require("core/rebar");
 const {checkStability} = __require("core/stability");
 const {concreteProps, rebarProps, GAMMA_C} = __require("core/units");
 
-/** 既定の設計条件(内空 2.0×2.0m、土被り 1.0m の標準的なケース) */
+/** 既定の設計条件(内空 2.0×2.0m、土被り 1.0〜3.0m) */
 function defaultInput() {
   return {
     title: 'RCボックスカルバート 設計計算',
+    project: {
+      name: '',       // 工事名
+      section: '',    // 工区名
+      designer: '',   // 設計者
+      date: '',       // 作成日(空欄なら計算書生成時の日付)
+      code: '',       // 製品No. / 型式
+    },
     dims: {
       clearWidth: 2000, clearHeight: 2000,
       topThickness: 300, bottomThickness: 300, wallThickness: 300,
@@ -588,19 +739,23 @@ function defaultInput() {
       haunchBottomH: 150, haunchBottomV: 150,
     },
     soil: {
-      cover: 1.0,        // 土被り m
+      coverMin: 1.0,     // 土被り H1(最小) m
+      coverMax: 3.0,     // 土被り H2(最大) m
       gamma: 19.0,       // 地下水位以浅の単位体積重量 kN/m3
       gammaSat: 20.0,    // 地下水位以深の飽和単位体積重量 kN/m3
       K0: 0.5,           // 静止土圧係数
       K0Left: null, K0Right: null, // 偏土圧を考慮する場合に個別指定
       alpha: 1.0,        // 鉛直土圧係数(突出形で 1.0 超)
-      waterLevel: null,  // 地表面からの地下水位深さ m(null で地下水なし)
+      waterLevel: null,  // 地表面からの地下水位深さ m(null で地下水を考慮しない)
     },
     live: {
       enabled: true,
       wheelLoad: 100, contactA: 0.2, contactB: 0.5,
-      wheelSpacing: 1.75, tanTheta: 1.0,
+      tanTheta: 1.0,
       impact: null,      // null で土被りから自動算定
+      occupancyWidth: 2.75, // 車両の占有幅 m
+      beta: 1.0,         // 断面力低減係数
+      surcharge: 10.0,   // 側載時の上載荷重(群集荷重) kN/m2
     },
     water: { innerLevel: 0 }, // 内水位(内空底面から)m
     material: {
@@ -622,6 +777,21 @@ function defaultInput() {
   };
 }
 
+/**
+ * 旧形式の入力(単一の soil.cover)を現行の coverMin / coverMax に読み替える。
+ * 保存済みJSONの読込で使う。
+ */
+function normalizeInput(input) {
+  const s = input.soil;
+  if (s && s.cover !== undefined && s.cover !== null) {
+    if (s.coverMin === undefined || s.coverMin === null) s.coverMin = s.cover;
+    if (s.coverMax === undefined || s.coverMax === null) s.coverMax = s.cover;
+  }
+  if (s && (s.coverMax === undefined || s.coverMax === null)) s.coverMax = s.coverMin;
+  if (!input.project) input.project = defaultInput().project;
+  return input;
+}
+
 /** 入力値の妥当性を確認し、問題があればメッセージを返す */
 function validate(input) {
   const errors = [];
@@ -632,7 +802,12 @@ function validate(input) {
   }
   if (d.haunchTopH > d.clearWidth / 2) errors.push('頂版ハンチが内空幅に対して大きすぎます。');
   if (d.haunchTopV > d.clearHeight / 2) errors.push('頂版ハンチが内空高に対して大きすぎます。');
-  if (input.soil.cover < 0) errors.push('土被りは 0 以上としてください。');
+  const { coverMin, coverMax } = input.soil;
+  if (!(coverMin >= 0)) errors.push('土被り H1(最小)は 0 以上としてください。');
+  if (!(coverMax >= 0)) errors.push('土被り H2(最大)は 0 以上としてください。');
+  if (coverMin >= 0 && coverMax >= 0 && coverMax < coverMin) {
+    errors.push('土被り H2(最大)は H1(最小)以上としてください。');
+  }
   if (!(input.ground.kv > 0)) errors.push('鉛直地盤反力係数は正の値としてください。');
   if (!(input.ground.qa > 0)) errors.push('許容支持力度は正の値としてください。');
   const cMax = Math.min(d.topThickness, d.bottomThickness, d.wallThickness);
@@ -640,6 +815,60 @@ function validate(input) {
     errors.push('かぶりの合計が部材厚以上です。かぶりまたは部材厚を見直してください。');
   }
   return errors;
+}
+
+const MODE_LABEL = { top: '上載', side: '側載' };
+
+/**
+ * 荷重ケースの一覧を作る。
+ * 土被りの最小と最大が等しい場合、または活荷重を考慮しない場合は
+ * 重複するケースを畳んで無駄なページを出さない。
+ */
+function buildCases(input) {
+  const { coverMin, coverMax, waterLevel } = input.soil;
+  const sameCover = Math.abs(coverMax - coverMin) < 1e-9;
+  const hasWater = waterLevel !== null && waterLevel !== undefined;
+  const covers = sameCover
+    ? [{ key: 'H', cover: coverMin }]
+    : [{ key: 'H1', cover: coverMin }, { key: 'H2', cover: coverMax }];
+  // 活荷重を考慮しない設定なら上載・側載を分ける意味がない
+  const modes = input.live.enabled ? ['top', 'side'] : ['top'];
+  const waters = hasWater ? [false, true] : [false];
+
+  const cases = [];
+  for (const water of waters) {
+    for (const c of covers) {
+      for (const mode of modes) {
+        const parts = [];
+        if (input.live.enabled) parts.push(MODE_LABEL[mode]);
+        parts.push(`土被り ${c.cover.toFixed(3)} m`);
+        if (hasWater) parts.push(water ? '地下水あり' : '地下水なし');
+        cases.push({
+          id: cases.length + 1,
+          cover: c.cover,
+          coverKey: c.key,
+          mode,
+          modeLabel: MODE_LABEL[mode],
+          water,
+          label: parts.join(' / '),
+        });
+      }
+    }
+  }
+  return cases;
+}
+
+/** 1ケース分の設計条件を組み立てる */
+function caseCondition(input, c) {
+  return {
+    ...input,
+    soil: {
+      ...input.soil,
+      cover: c.cover,
+      waterLevel: c.water ? input.soil.waterLevel : null,
+    },
+    live: { ...input.live, mode: c.mode },
+  };
 }
 
 /** 1つの照査断面グループについて配筋を決める */
@@ -652,7 +881,7 @@ function designGroup(group, allow, material, options) {
   let asMin = 0;
 
   for (let i = 0; i < 4; i++) {
-    asReq = requiredAs(group.M, h, cover, dia, allow.sigmaSa);
+    asReq = requiredAsAxial(group.M, group.N, h, cover, dia, allow.sigmaSa);
     asMin = minimumAs(h, cover, dia, material.minAsRatio);
     const need = Math.max(asReq, asMin);
     const list = selectRebar(need, options.rebar);
@@ -682,7 +911,8 @@ function designGroup(group, allow, material, options) {
 
 const FACE_LABEL = { inner: '内側(内空側)', outer: '外側(土側)' };
 
-function design(input) {
+function design(rawInput) {
+  const input = normalizeInput(rawInput);
   const errors = validate(input);
   if (errors.length) return { ok: false, errors };
 
@@ -698,13 +928,16 @@ function design(input) {
     tauA2: conc.tauA2 * inc,
   };
 
-  // 地下水位が側壁の途中にある場合は、そこを分割の切れ目にして折れ点を再現する
+  // 形状は荷重ケースに依存しないので一度だけ作る。
+  // 地下水位が側壁の途中にある場合はそこを分割の切れ目にして折れ点を再現する。
   const extraWallBreaks = [];
   const geoTmp = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 4 });
   if (input.soil.waterLevel !== null && input.soil.waterLevel !== undefined) {
-    const zBottomAxis = input.soil.cover + geoTmp.outerH - geoTmp.dims.t2 / 2;
-    const sAtWater = zBottomAxis - input.soil.waterLevel;
-    if (sAtWater > 0 && sAtWater < geoTmp.Hc) extraWallBreaks.push(sAtWater);
+    for (const cover of [input.soil.coverMin, input.soil.coverMax]) {
+      const zBottomAxis = cover + geoTmp.outerH - geoTmp.dims.t2 / 2;
+      const sAtWater = zBottomAxis - input.soil.waterLevel;
+      if (sAtWater > 0 && sAtWater < geoTmp.Hc) extraWallBreaks.push(sAtWater);
+    }
   }
 
   const geo = buildGeometry(input.dims, {
@@ -713,13 +946,57 @@ function design(input) {
     extraWallBreaks,
   });
 
-  const loads = buildLoads(geo, input);
-  warnings.push(...loads.warnings);
+  // ---- 各ケースを解く --------------------------------------------------
+  const cases = buildCases(input);
+  const solved = cases.map((c) => {
+    const cond = caseCondition(input, c);
+    const loads = buildLoads(geo, cond);
+    const ana = analyze(geo, loads);
+    const sections = checkSections(geo, ana);
+    const shear = shearSections(geo, ana);
+    const stability = checkStability(geo, loads, ana, cond);
+    return { ...c, cond, loads, ana, sections, shear, stability };
+  });
+  for (const s of solved) {
+    for (const w of s.loads.warnings) warnings.push(`CASE-${s.id}: ${w}`);
+  }
 
-  const ana = analyze(geo, loads);
-  const sections = checkSections(geo, ana);
+  // ---- 断面力の包絡 ----------------------------------------------------
+  // 照査断面 × 引張面 ごとに、全ケース中の最大 |M| とそのときの軸力・ケースを採る。
+  const envelope = new Map();
+  const shearEnvelope = new Map();
+  for (const s of solved) {
+    for (const sec of s.sections) {
+      const key = `${sec.member}|${sec.label}|${sec.tensionSide}`;
+      const prev = envelope.get(key);
+      if (!prev || Math.abs(sec.M) > Math.abs(prev.M)) {
+        envelope.set(key, {
+          member: sec.member, memberName: sec.memberName, label: sec.label,
+          s: sec.s, h: sec.h, purpose: sec.purpose, face: sec.tensionSide,
+          faceLabel: FACE_LABEL[sec.tensionSide],
+          M: sec.M, N: sec.N, S: sec.S, caseId: s.id, caseLabel: s.label,
+        });
+      }
+    }
+    // せん断は τ点(支点前面から h/2、ハンチ考慮の h')で別に包絡する
+    for (const t of s.shear) {
+      const skey = `${t.member}|${t.label}`;
+      const prev = shearEnvelope.get(skey);
+      if (!prev || Math.abs(t.S) > Math.abs(prev.S)) {
+        shearEnvelope.set(skey, { ...t, caseId: s.id, perCase: prev ? prev.perCase : {} });
+      }
+    }
+  }
+  // ケース別の値も帳票に出すため保持する
+  for (const s of solved) {
+    for (const t of s.shear) {
+      const e = shearEnvelope.get(`${t.member}|${t.label}`);
+      if (e) e.perCase[s.id] = t.S;
+    }
+  }
+  const enveloped = [...envelope.values()];
 
-  // 部材 × 引張面 でグループ化し、最大曲げモーメントで配筋を決める
+  // ---- 配筋の決定(部材 × 引張面) --------------------------------------
   const groups = new Map();
   for (const key of ['top', 'bottom', 'left', 'right']) {
     for (const face of ['inner', 'outer']) {
@@ -730,18 +1007,19 @@ function design(input) {
         faceLabel: FACE_LABEL[face],
         M: 0, S: 0, N: 0,
         h: geo.memberMap[key].t,
-        governing: null,
+        governing: null, caseId: null,
       });
     }
   }
-  for (const sec of sections) {
-    const g = groups.get(`${sec.member}:${sec.tensionSide}`);
-    if (Math.abs(sec.M) >= Math.abs(g.M)) {
-      g.M = Math.abs(sec.M);
-      g.S = Math.abs(sec.S);
-      g.N = sec.N;
-      g.h = sec.h;
-      g.governing = sec.label;
+  for (const e of enveloped) {
+    const g = groups.get(`${e.member}:${e.face}`);
+    if (Math.abs(e.M) >= Math.abs(g.M)) {
+      g.M = Math.abs(e.M);
+      g.S = Math.abs(e.S);
+      g.N = e.N;
+      g.h = e.h;
+      g.governing = e.label;
+      g.caseId = e.caseId;
     }
   }
 
@@ -749,16 +1027,20 @@ function design(input) {
   const designed = [...groups.values()].map((g) => designGroup(g, allow, input.material, options));
   const designMap = new Map(designed.map((d) => [`${d.member}:${d.face}`, d]));
 
-  // 決定した配筋で全断面を照査する
-  const results = sections.map((sec) => {
-    const d = designMap.get(`${sec.member}:${sec.tensionSide}`);
+  // ---- 決定した配筋で包絡断面力を照査 ----------------------------------
+  const results = enveloped.map((e) => {
+    const d = designMap.get(`${e.member}:${e.face}`);
     const As = d.selected ? d.selected.As : 0;
     const chk = checkSection({
-      M: sec.M, S: sec.S, N: sec.N,
-      h: sec.h * 1000, cover: d.cover, barDia: d.selected ? d.selected.dia : 16,
-      As, allow,
+      M: e.M, S: e.S, N: e.N,
+      h: e.h * 1000, cover: d.cover, barDia: d.selected ? d.selected.dia : 16,
+      As, allow, skipShear: true,
     });
-    return { ...sec, rebar: d.selected, cover: d.cover, check: chk };
+    return { ...e, rebar: d.selected, cover: d.cover, check: chk };
+  });
+  results.sort((a, b) => {
+    const order = ['top', 'bottom', 'left', 'right'];
+    return order.indexOf(a.member) - order.indexOf(b.member) || a.s - b.s;
   });
 
   for (const d of designed) {
@@ -768,21 +1050,40 @@ function design(input) {
       warnings.push(`${d.memberName} ${d.faceLabel}: 曲げモーメント ${d.M.toFixed(1)} kN·m/m が単鉄筋断面の抵抗上限 ${d.concreteCapacity.toFixed(1)} kN·m/m を超えます。部材厚の増加または圧縮鉄筋の配置が必要です。`);
     }
   }
-  for (const r of results) {
-    if (!r.check.checks.shear.ok) {
-      warnings.push(`${r.label}: 平均せん断応力度 ${r.check.tau.toFixed(3)} N/mm² が許容値 ${allow.tauA1.toFixed(3)} N/mm² を超えます。部材厚の増加またはハンチの拡大を検討してください。`);
+  // ---- せん断の照査(τ点) -----------------------------------------------
+  const shearResults = [...shearEnvelope.values()].map((t) => {
+    const face = t.M >= 0 ? 'inner' : 'outer';
+    const d = designMap.get(`${t.member}:${face}`);
+    const As = d && d.selected ? d.selected.As : 0;
+    const chk = checkShear({
+      S: t.S, h: t.hEff * 1000, cover: d.cover,
+      barDia: d.selected ? d.selected.dia : 16, As, allow,
+    });
+    return { ...t, face, rebar: d.selected, cover: d.cover, check: chk };
+  });
+  shearResults.sort((a, b) => {
+    const order = ['top', 'bottom', 'left', 'right'];
+    return order.indexOf(a.member) - order.indexOf(b.member) || a.s - b.s;
+  });
+  for (const t of shearResults) {
+    if (!t.check.ok) {
+      warnings.push(`${t.label}: 平均せん断応力度 ${t.check.tau.toFixed(3)} N/mm² が許容値 ${allow.tauA1.toFixed(3)} N/mm² を超えます。部材厚の増加またはハンチの拡大を検討してください。`);
     }
   }
 
-  const stability = checkStability(geo, loads, ana, input);
-  if (stability.balance.error > 1e-3 * Math.max(1, Math.abs(stability.balance.applied))) {
-    warnings.push(`鉛直方向の釣合い誤差が大きくなっています(載荷 ${stability.balance.applied.toFixed(2)} kN/m に対し反力 ${stability.balance.reaction.toFixed(2)} kN/m)。`);
+  // ---- 安定検討は全ケース中の最も厳しい結果を採る ----------------------
+  const stability = mergeStability(solved);
+  for (const s of solved) {
+    const b = s.stability.balance;
+    if (b.error > 1e-3 * Math.max(1, Math.abs(b.applied))) {
+      warnings.push(`CASE-${s.id}: 鉛直方向の釣合い誤差が大きくなっています(載荷 ${b.applied.toFixed(2)} kN/m に対し反力 ${b.reaction.toFixed(2)} kN/m)。`);
+    }
   }
 
   const mainAsMax = Math.max(...designed.map((d) => (d.selected ? d.selected.As : 0)));
   const distribution = distributionRebar(mainAsMax, options.rebar);
-
-  const sectionOk = results.every((r) => r.check.ok);
+  const bendingOk = results.every((r) => r.check.ok);
+  const shearOk = shearResults.every((t) => t.check.ok);
 
   return {
     ok: true,
@@ -790,24 +1091,65 @@ function design(input) {
     allow,
     concrete: conc,
     rebarGrade: bar,
-    geo, loads, ana,
+    geo,
+    cases: solved,
+    // 既定の表示対象(最も断面力が大きいケース)
+    governingCase: solved.reduce((a, b) =>
+      maxAbsMoment(b.sections) > maxAbsMoment(a.sections) ? b : a).id,
+    loads: solved[0].loads,
+    ana: solved[0].ana,
     sections: results,
+    shear: shearResults,
     rebarPlan: designed,
     distribution,
     stability,
     warnings: [...new Set(warnings)],
     verdict: {
-      section: sectionOk,
+      bending: bendingOk,
+      shear: shearOk,
+      section: bendingOk && shearOk,
       stability: stability.ok,
-      overall: sectionOk && stability.ok,
-      maxRatio: Math.max(...results.map((r) => r.check.maxRatio)),
+      overall: bendingOk && shearOk && stability.ok,
+      maxRatio: Math.max(
+        ...results.map((r) => r.check.maxRatio),
+        ...shearResults.map((t) => t.check.check.ratio),
+      ),
     },
+  };
+}
+
+const maxAbsMoment = (sections) =>
+  sections.reduce((m, s) => Math.max(m, Math.abs(s.M)), 0);
+
+/** 全ケースの安定照査から最も厳しい結果を選ぶ */
+function mergeStability(solved) {
+  const merged = [];
+  const keys = solved[0].stability.items.map((i) => i.key);
+  for (const key of keys) {
+    let worst = null;
+    let worstCase = null;
+    for (const s of solved) {
+      const item = s.stability.items.find((i) => i.key === key);
+      if (!worst || item.ratio > worst.ratio || (worst.ok && !item.ok)) {
+        worst = item;
+        worstCase = s;
+      }
+    }
+    merged.push({ ...worst, caseId: worstCase.id, caseLabel: worstCase.label });
+  }
+  const worstBalance = solved.reduce((a, b) =>
+    b.stability.balance.error > a.stability.balance.error ? b : a).stability.balance;
+  return {
+    items: merged,
+    balance: worstBalance,
+    ok: merged.every((i) => i.ok),
+    perCase: solved.map((s) => ({ id: s.id, label: s.label, ok: s.stability.ok })),
   };
 }
 
 
 
-return { defaultInput, validate, design, arrangement };
+return { defaultInput, normalizeInput, validate, buildCases, design, arrangement };
 });
 
 __define("core/geometry", function () {
@@ -949,10 +1291,13 @@ function buildGeometry(dims, opts = {}) {
     const uy = (b.y - a.y) / d.length;
     const heightAt = makeHeightFn(d.t, d.length, d.e1, d.e2);
 
-    // ハンチ端・支点前面などを分割の切れ目として必ず含める
+    // ハンチ端・支点前面・せん断照査位置(支点前面から t/2)を
+    // 分割の切れ目として必ず含める。照査位置が節点に乗ることで、
+    // 断面力を補間せずに取り出せ、左右対称性も厳密に保たれる。
     const key = [
       d.e1.joint, d.e1.joint + d.e1.taper,
       d.length - d.e2.joint - d.e2.taper, d.length - d.e2.joint,
+      d.e1.joint + d.t / 2, d.length - d.e2.joint - d.t / 2,
       ...d.breaks,
     ];
     const bp = cleanBreakpoints(key, d.length);
@@ -1146,6 +1491,12 @@ __define("core/loads", function () {
  *   3. 活荷重による鉛直土圧(T-25 後輪荷重の分布、衝撃を含む)
  *   4. 側方土圧(静止土圧、地下水位以下は有効応力+水圧)
  *   5. 活荷重による側方土圧
+ *
+ * 活荷重の載荷位置(live.mode)
+ *   'top'  上載 … 輪荷重がカルバート直上にある。頂版に鉛直活荷重が載り、
+ *                 側壁には活荷重による上載荷重を考慮しない。
+ *   'side' 側載 … 荷重がカルバート側方にある。頂版に鉛直活荷重は載らず、
+ *                 背面の上載荷重 Q(群集荷重)による側方土圧のみを考慮する。
  *   6. 外水圧・揚圧力(浮力)、内水重・内水圧
  *   7. 底版反力 → 弾性床(鉛直バネ)として与えるため荷重としては扱わない
  *
@@ -1165,25 +1516,32 @@ function impactFactor(cover) {
 }
 
 /**
- * 活荷重(T-25)による鉛直土圧
- * 後輪荷重 P を接地面 a×b から分布角 θ で分散させ、
- * 1後軸の左右2輪ぶんを合成した平均圧力として与える。
+ * 活荷重による鉛直土圧
  *
- * @returns {{q:number, impact:number, La:number, Lb:number, overlap:boolean, note:string}}
+ * 実務の設計計算書で用いられる式による。
+ *   輪分布幅   ｕ ＝ a + 2H·tanθ      (進行方向)
+ *              ｖ ＝ b + 2H·tanθ      (車両直角方向。参考値)
+ *   活荷重     Ｐl  ＝ Ｐ(1+i)·β
+ *              Ｐvl ＝ 2·Ｐl / Ｗ / ｕ
+ * ここに Ｐ は後輪1輪の荷重(T-25 で 0.4×T ＝ 100 kN)、Ｗ は車両の占有幅(2.75 m)、
+ * i は衝撃係数、β は断面力低減係数。
+ *
+ * @returns {{q:number, impact:number, beta:number, u:number, v:number,
+ *            Pl:number, occupancy:number, note:string}}
  */
 function liveLoadPressure(cover, o = {}) {
-  const P = o.wheelLoad ?? 100;        // 後輪1輪の荷重 kN(T-25)
-  const a = o.contactA ?? 0.2;         // 接地長(進行方向) m
-  const b = o.contactB ?? 0.5;         // 接地幅(車両直角方向) m
-  const spacing = o.wheelSpacing ?? 1.75; // 左右輪の中心間隔 m
-  const tanTheta = o.tanTheta ?? 1.0;  // 分布角(既定 45°)
+  const P = o.wheelLoad ?? 100;           // 後輪1輪の荷重 kN(T-25 で 0.4×250)
+  const a = o.contactA ?? 0.2;            // 接地長(進行方向) m
+  const b = o.contactB ?? 0.5;            // 接地幅(車両直角方向) m
+  const tanTheta = o.tanTheta ?? 1.0;     // 分布角(既定 45°)
+  const W = o.occupancyWidth ?? 2.75;     // 車両の占有幅 m
+  const beta = o.beta ?? 1.0;             // 断面力低減係数
   const i = o.impact ?? impactFactor(cover);
 
-  const La = a + 2 * cover * tanTheta;      // 進行方向の分布長
-  const Lb0 = b + 2 * cover * tanTheta;     // 1輪の直角方向分布幅
-  const overlap = Lb0 > spacing;
-  const Lb = overlap ? spacing + Lb0 : 2 * Lb0;
-  const q = (2 * P * (1 + i)) / (La * Lb);
+  const u = a + 2 * cover * tanTheta;
+  const v = b + 2 * cover * tanTheta;
+  const Pl = P * (1 + i) * beta;
+  const q = (2 * Pl) / W / u;
 
   let note = '';
   if (cover < 0.5) {
@@ -1192,7 +1550,7 @@ function liveLoadPressure(cover, o = {}) {
   } else if (cover >= 6.5) {
     note = '土被りが大きく衝撃を考慮しない範囲です。';
   }
-  return { q, impact: i, La, Lb, overlap, note };
+  return { q, impact: i, beta, u, v, Pl, occupancy: W, note };
 }
 
 /** 深さ z における全鉛直応力・間隙水圧 */
@@ -1264,16 +1622,21 @@ function buildLoads(geo, cond) {
   const earthTop = alpha * sigmaVTop;  // 頂版上面に作用する全鉛直圧 kN/m2
 
   // ---- 3. 活荷重 --------------------------------------------------------
-  const live = cond.live.enabled
+  const mode = cond.live.mode ?? 'top';
+  const live = cond.live.enabled && mode === 'top'
     ? liveLoadPressure(cover, cond.live)
-    : { q: 0, impact: 0, La: 0, Lb: 0, overlap: false, note: '活荷重は考慮しない設定です。' };
-  if (live.note) warnings.push(live.note);
+    : { q: 0, impact: 0, La: 0, Lb: 0, overlap: false, note: '' };
+  if (cond.live.enabled && mode === 'top' && live.note) warnings.push(live.note);
+  // 側載時は背面の上載荷重(群集荷重)のみを考慮する
+  const surcharge = cond.live.enabled && mode === 'side'
+    ? (cond.live.surcharge ?? 10)
+    : 0;
 
   const qTop = earthTop + live.q; // 頂版に載る鉛直荷重 kN/m2
   for (const id of geo.memberMap.top.elemIds) push(id, 0, -qTop, 0, -qTop);
 
-  // ---- 4,5. 側方土圧(活荷重ぶんを含む) --------------------------------
-  const liveLateral = live.q; // 上載荷重として扱う
+  // ---- 4,5. 側方土圧(側載時の上載荷重ぶんを含む) ------------------------
+  const liveLateral = surcharge;
   const wallPressure = (z, K) =>
     lateralStress(z, soil, K) + K * alpha * liveLateral;
 
@@ -1343,7 +1706,7 @@ function buildLoads(geo, cond) {
     zTop, zBottom, zTopAxis, zBottomAxis,
     waterDepth: soil.waterDepth,
     sigmaVTop, uTop, earthTop,
-    live,
+    live, liveMode: mode, surcharge,
     qTop,
     lateralTopLeft: wallPressure(zTopAxis, Kl),
     lateralBottomLeft: wallPressure(zBottomAxis, Kl),
@@ -1490,13 +1853,49 @@ function checkSections(geo, ana) {
   for (const key of ['top', 'bottom', 'left', 'right']) {
     const m = geo.memberMap[key];
     add(key, `${m.name} 支間中央`, m.length / 2, 'span');
-    add(key, `${m.name} 端部(始端ハンチ端)`, m.haunchEnd1, 'end');
-    add(key, `${m.name} 端部(終端ハンチ端)`, m.haunchEnd2, 'end');
+    add(key, `${m.name} ハンチ端(始)`, m.haunchEnd1, 'end');
+    add(key, `${m.name} ハンチ端(終)`, m.haunchEnd2, 'end');
   }
   return out;
 }
 
-return { analyze, checkSections };
+/**
+ * せん断力の照査断面(τ点)。
+ *
+ * 照査位置は支点前面(直交部材の内面)から h/2 の位置とする。
+ * その位置がハンチ内にある場合、部材断面の高さはハンチ高さ C' の 1/3 まで
+ * 大きくとってよい(参照した実務の計算書による)。
+ *
+ *   h' = T + C'/3      C' はその位置におけるハンチの高さ
+ *
+ * ハンチが T/2 以下の場合、照査位置がハンチ端の外に出るため C' = 0 となり、
+ * 基本厚 T のままとなる。
+ */
+function shearSections(geo, ana) {
+  const out = [];
+  for (const key of ['top', 'bottom', 'left', 'right']) {
+    const m = geo.memberMap[key];
+    const T = m.t;
+    const spots = [
+      { label: `${m.name} τ点(始端)`, s: Math.min(m.face1 + T / 2, m.length / 2) },
+      { label: `${m.name} τ点(終端)`, s: Math.max(m.face2 - T / 2, m.length / 2) },
+    ];
+    for (const spot of spots) {
+      const f = ana.forceAt(key, spot.s);
+      const hAt = m.heightAt(spot.s);
+      const haunch = Math.max(0, hAt - T);   // C'
+      const hEff = T + haunch / 3;           // h'
+      out.push({
+        member: key, memberName: m.name, label: spot.label, s: spot.s,
+        T, haunch, hEff, h: hEff,
+        M: f.M, S: f.S, N: f.N,
+      });
+    }
+  }
+  return out;
+}
+
+return { analyze, checkSections, shearSections };
 });
 
 __define("core/frame", function () {
@@ -1800,12 +2199,22 @@ __define("core/rc", function () {
  * 許容応力度法による鉄筋コンクリート断面の照査
  *
  * 単鉄筋長方形断面(奥行 1000mm)を対象とし、ヤング係数比 n の弾性理論による。
- *   中立軸:  b·x²/2 = n·As·(d − x)
- *   応力度:  σc = 2M/(b·x·j·d),  σs = M/(As·j·d),  j = 1 − x/(3d)
- *   せん断:  τm = S/(b·j·d)
+ * 軸力を考慮した偏心圧縮として解く。
  *
- * 軸力(圧縮)は曲げによるコンクリート圧縮応力度に N/Ag を加算する形で
- * 付加的に考慮する(引張鉄筋側には安全側となるよう考慮しない)。
+ *   偏位量        e  = M / N
+ *   鉄筋位置      c  = d − T/2        (部材中心軸と鉄筋間距離)
+ *   軸力考慮曲げ  Ms = M + N·c        (引張鉄筋まわりのモーメント)
+ *
+ *   中立軸 x は次式の解として求める(N を掛けた形にして N=0 でも安定に解ける)。
+ *     N·x³ − 3(N·T/2 − M)·x² + 6n·As/b·Ms·(x − d) = 0
+ *
+ *   応力度   σc = 2·Ms / (b·x·(d − x/3))
+ *            σs = n·σc·(d − x) / x
+ *   せん断   τm = S / (b·j·d),  j = 1 − x/(3d)
+ *
+ * N = 0 のとき中立軸の式は b·x²/2 = n·As·(d − x) に、
+ * σc は 2M/(b·x·j·d) に一致し、軸力を無視した従来式に退化する。
+ *
  * 単位は N・mm 系(M: N·mm、S: N、寸法: mm、応力度: N/mm2)。
  */
 
@@ -1816,6 +2225,30 @@ function neutralAxis(b, d, As, n = YOUNG_RATIO) {
   if (As <= 0) return 0;
   const k = (n * As) / b;
   return k * (Math.sqrt(1 + (2 * b * d) / (n * As)) - 1);
+}
+
+/**
+ * 軸力を考慮した中立軸 x(mm) を二分法で求める。
+ * @param {number} M 曲げモーメント (N·mm、絶対値)
+ * @param {number} N 軸圧縮力 (N、圧縮正)
+ * @returns {{x:number, full:boolean}} full=true は断面全圧縮(引張が生じない)
+ */
+function neutralAxisAxial(b, h, d, As, M, N, n = YOUNG_RATIO) {
+  if (As <= 0) return { x: 0, full: false };
+  const c = d - h / 2;
+  const Ms = M + N * c;
+  if (Ms <= 0) return { x: d, full: true };
+  const k = (6 * n * As) / b;
+  const f = (x) => N * x ** 3 - 3 * (N * h / 2 - M) * x ** 2 + k * Ms * (x - d);
+  // f(0) = -k·Ms·d < 0。f(d) > 0 なら (0, d) に解がある。
+  if (f(d) <= 0) return { x: d, full: true };
+  let lo = 1e-9;
+  let hi = d;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) > 0) hi = mid; else lo = mid;
+  }
+  return { x: (lo + hi) / 2, full: false };
 }
 
 /**
@@ -1837,14 +2270,14 @@ function checkSection(p) {
   const N = (p.N || 0) * 1e3;      // kN → N(圧縮正)
   const As = p.As;
 
-  const x = neutralAxis(b, d, As, n);
+  const c = d - p.h / 2;              // 部材中心軸と鉄筋間距離
+  const Ms = M + N * c;               // 軸力を考慮した曲げモーメント
+  const { x, full } = neutralAxisAxial(b, p.h, d, As, M, N, n);
   const j = 1 - x / (3 * d);
   const z = j * d;
 
-  const sigmaCBending = As > 0 && x > 0 ? (2 * M) / (b * x * z) : Infinity;
-  const sigmaCAxial = N / (b * p.h);
-  const sigmaC = sigmaCBending + sigmaCAxial;
-  const sigmaS = As > 0 ? M / (As * z) : Infinity;
+  const sigmaC = As > 0 && x > 0 ? (2 * Ms) / (b * x * z) : Infinity;
+  const sigmaS = full ? 0 : (As > 0 && x > 0 ? (n * sigmaC * (d - x)) / x : Infinity);
   const tau = S / (b * z);
 
   const ratio = (v, a) => (a > 0 ? v / a : Infinity);
@@ -1859,17 +2292,20 @@ function checkSection(p) {
       value: sigmaS, allow: p.allow.sigmaSa, unit: 'N/mm²',
       ratio: ratio(sigmaS, p.allow.sigmaSa),
     },
-    shear: {
+  };
+  // せん断はハンチを考慮した別の照査位置で行うため、既定では曲げのみを判定する
+  if (!p.skipShear) {
+    checks.shear = {
       label: '平均せん断応力度',
       value: tau, allow: p.allow.tauA1, unit: 'N/mm²',
       ratio: ratio(tau, p.allow.tauA1),
-    },
-  };
+    };
+  }
   for (const c of Object.values(checks)) c.ok = c.ratio <= 1.0 + 1e-9;
 
   return {
-    b, d, x, j, z, As,
-    sigmaCBending, sigmaCAxial, sigmaC, sigmaS, tau,
+    b, d, x, j, z, As, c, Ms: Ms / 1e6, e: N > 0 ? M / N : Infinity, full,
+    sigmaC, sigmaS, tau,
     checks,
     ok: Object.values(checks).every((c) => c.ok),
     maxRatio: Math.max(...Object.values(checks).map((c) => c.ratio)),
@@ -1895,6 +2331,62 @@ function requiredAs(M, h, cover, barDia, sigmaSa, b = 1000, n = YOUNG_RATIO) {
   return As;
 }
 
+/**
+ * 軸力を考慮した必要鉄筋量 As (mm2/m)。
+ * 鉄筋応力度が許容値 σsa にちょうど達する As を二分法で求める。
+ * 軸圧縮は鉄筋応力度を下げるため、N を無視した値より小さくなる。
+ */
+function requiredAsAxial(M, N, h, cover, barDia, sigmaSa, b = 1000, n = YOUNG_RATIO) {
+  const d = h - cover - barDia / 2;
+  const Mn = Math.abs(M) * 1e6;
+  const Nn = (N || 0) * 1e3;
+  if (d <= 0) return 0;
+  const c = d - h / 2;
+  if (Mn + Nn * c <= 0) return 0;
+
+  const stress = (As) => {
+    const { x, full } = neutralAxisAxial(b, h, d, As, Mn, Nn, n);
+    if (full || x <= 0) return 0;
+    const sc = (2 * (Mn + Nn * c)) / (b * x * (d - x / 3));
+    return (n * sc * (d - x)) / x;
+  };
+
+  let lo = 1e-3;
+  let hi = 0.1 * b * d; // 鉄筋比 10% を上限とする
+  if (stress(hi) > sigmaSa) return hi;   // この断面では満たせない
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (stress(mid) > sigmaSa) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+/**
+ * せん断応力度の照査。
+ * 有効断面高 h は呼び出し側で決める(ハンチ部では h' = T + C'/3)。
+ * 中立軸は曲げのみの式で求め、τm = S / (b·j·d) とする。
+ */
+function checkShear(p) {
+  const b = p.b ?? 1000;
+  const n = p.n ?? YOUNG_RATIO;
+  const d = p.h - p.cover - p.barDia / 2;
+  const S = Math.abs(p.S) * 1e3; // kN → N
+  const x = neutralAxis(b, d, p.As, n);
+  const j = 1 - x / (3 * d);
+  const z = j * d;
+  const tau = z > 0 ? S / (b * z) : Infinity;
+  const ratio = p.allow.tauA1 > 0 ? tau / p.allow.tauA1 : Infinity;
+  return {
+    d, x, j, z, tau,
+    check: {
+      label: '平均せん断応力度',
+      value: tau, allow: p.allow.tauA1, unit: 'N/mm²',
+      ratio, ok: ratio <= 1.0 + 1e-9,
+    },
+    ok: ratio <= 1.0 + 1e-9,
+  };
+}
+
 /** 最小鉄筋量(既定: 有効断面 b·d の 0.2%) */
 function minimumAs(h, cover, barDia, ratio = 0.002, b = 1000) {
   const d = h - cover - barDia / 2;
@@ -1913,7 +2405,7 @@ function concreteCapacityMoment(h, cover, barDia, sigmaCa, sigmaSa, b = 1000, n 
   return (0.5 * sigmaCa * b * kb * d * jb * d) / 1e6; // kN·m/m
 }
 
-return { neutralAxis, checkSection, requiredAs, minimumAs, concreteCapacityMoment };
+return { neutralAxis, neutralAxisAxial, checkSection, requiredAs, requiredAsAxial, checkShear, minimumAs, concreteCapacityMoment };
 });
 
 __define("core/rebar", function () {
@@ -2386,6 +2878,21 @@ return { sectionSVG, loadSVG, diagramSVG, reactionSVG };
 __define("ui/report", function () {
 /**
  * 計算書(印刷用)の生成
+ *
+ * 章立てと体裁は実務のボックスカルバート設計計算書にならう。
+ *
+ *   表紙
+ *   1 設計条件      1.1 一般条件 1.2 単位体積重量 1.3 土圧係数 1.4 活荷重
+ *                   1.5 衝撃係数 1.6 鉄筋かぶり 1.7 許容応力度
+ *                   1.8 標準断面図 1.9 荷重の組合せ
+ *   2 断面力計算    2.n.1 設計荷重 / 2.n.2 構造解析 / 2.n.3 各部材の断面力
+ *   3 断面力集計表  各ケースから最大値を抽出(M・N・e・c・Ms・CASE)
+ *   4 必要鉄筋量
+ *   5 配筋及び実応力度
+ *   6 せん断力に対する検討
+ *   7 安定・基礎の検討
+ *   8 確認事項
+ *
  * 算定の根拠が追えるよう、用いた式と数値を併記する。
  */
 
@@ -2393,139 +2900,321 @@ const {sectionSVG, loadSVG, diagramSVG} = __require("ui/draw");
 
 const n = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—');
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const mm = (v) => Math.round(v * 1000);
 
-function table(rows, head) {
-  return `<table class="rp">${head ? `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>` : ''}
-    <tbody>${rows.map((r) => `<tr>${r.map((c, i) =>
-      (!head && i === 0 ? `<th>${c}</th>` : `<td>${c}</td>`)).join('')}</tr>`).join('')}</tbody></table>`;
+/** 「記号 : 値 [単位]」の整列行 */
+function defRows(rows) {
+  return `<table class="rp def">${rows.map(([label, sym, val, unit]) => `<tr>
+    <td class="lbl">${label}</td><td class="sym">${sym}</td>
+    <td class="eq">${val === '' ? '' : '＝'}</td><td class="val">${val}</td>
+    <td class="unit">${unit ? `[${unit}]` : ''}</td></tr>`).join('')}</table>`;
+}
+
+function table(rows, head, cls = '') {
+  return `<table class="rp ${cls}">${head ? `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>` : ''}
+    <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+/** 断面力一覧表(部材の各点における M・S・N) */
+function forceTable(geo, ana) {
+  const rows = [];
+  for (const key of ['top', 'bottom', 'left', 'right']) {
+    const m = geo.memberMap[key];
+    const pts = [
+      ['端部(始点)', 0],
+      ['ハンチ端(始点側)', m.haunchEnd1],
+      ['中央', m.length / 2],
+      ['ハンチ端(終点側)', m.haunchEnd2],
+      ['端部(終点)', m.length],
+    ];
+    pts.forEach(([name, s], i) => {
+      const p = ana.forceAt(key, s);
+      rows.push([
+        i === 0 ? `<b>${esc(m.name)}</b>` : '', name, n(s, 3),
+        n(p.M, 2), n(p.S, 2), n(p.N, 2),
+      ]);
+    });
+  }
+  return table(rows, ['部材', '点', 'x (m)', 'M (kN·m/m)', 'S (kN/m)', 'N (kN/m)'], 'num');
+}
+
+/** 1ケース分の章 */
+function caseChapter(r, c, idx) {
+  const s = c.loads.summary;
+  const no = `2.${idx + 1}`;
+  const live = s.liveMode === 'top' && s.live.q > 0 ? `
+    <p class="formula">(3) 活荷重<br>
+      ① 輪分布幅 ｕ ＝ a + 2Ｈ·tanθ ＝ ${n(r.input.live.contactA, 2)} + 2 × ${n(s.cover, 3)}
+         × ${n(r.input.live.tanTheta, 2)} ＝ <b>${n(s.live.u, 3)} ｍ</b><br>
+      　　　　　　 ｖ ＝ b + 2Ｈ·tanθ ＝ ${n(s.live.v, 3)} ｍ<br>
+      ② 活荷重 Ｐl ＝ Ｐ(1+i)·β ＝ ${n(r.input.live.wheelLoad, 0)} × (1 + ${n(s.live.impact, 3)})
+         × ${n(s.live.beta, 3)} ＝ <b>${n(s.live.Pl, 3)} kＮ</b><br>
+      　　　　　 Ｐvl ＝ 2Ｐl / Ｗ / ｕ ＝ 2 × ${n(s.live.Pl, 3)} / ${n(s.live.occupancy, 2)}
+         / ${n(s.live.u, 3)} ＝ <b>${n(s.live.q)} kＮ/m²</b></p>`
+    : s.liveMode === 'side' && s.surcharge > 0 ? `
+    <p class="formula">(3) 活荷重 側載のため頂版に鉛直活荷重は載らない。背面の上載荷重
+      Ｑ ＝ <b>${n(s.surcharge)} kＮ/m²</b> による側方土圧として考慮する。</p>`
+    : '<p class="formula">(3) 活荷重 このケースでは考慮しない。</p>';
+
+  return `
+  <section class="chapter">
+  <h2>${no} 荷重ケース CASE-${c.id}(${esc(c.label)})</h2>
+
+  <h3>${no}.1 設計荷重</h3>
+  <p class="formula">(1) 躯体自重 Ｗ ＝ Ａc × γc
+     ＝ ${n(r.geo.solidArea, 4)} × ${n(r.input.material.gammaC)} ＝ <b>${n(s.selfWeight)} kＮ/m</b></p>
+  <p class="formula">(2) 鉛直土圧 Ｐvd ＝ α × σv(h)
+     ＝ ${n(s.alpha, 3)} × ${n(s.sigmaVTop)} ＝ <b>${n(s.earthTop)} kＮ/m²</b></p>
+  ${live}
+  <p class="formula">(4) 頂版の鉛直荷重 ｑ ＝ Ｐvd${s.liveMode === 'top' && s.live.q > 0 ? ' + Ｐvl' : ''}
+     ＝ <b>${n(s.qTop)} kＮ/m²</b></p>
+  <p class="formula">(5) 水平土圧 σh(z) ＝ Ｋ(σv(z) − u(z)) + u(z) + Ｋ·α·Ｑ</p>
+  ${table([
+    ['側壁上端(頂版中心)', n(s.zTopAxis, 3), n(s.lateralTopLeft), n(s.lateralTopRight)],
+    ['側壁下端(底版中心)', n(s.zBottomAxis, 3), n(s.lateralBottomLeft), n(s.lateralBottomRight)],
+  ], ['位置', '深さ (m)', '左 (kN/m²)', '右 (kN/m²)'], 'num')}
+  ${s.uBottom > 0 ? `<p class="formula">(6) 底版下面の揚圧力 ｕ ＝ <b>${n(s.uBottom)} kＮ/m²</b></p>` : ''}
+  <p class="formula">(7) 鉛直方向の釣合い ΣＶ ＝ <b>${n(s.totalVertical)} kＮ/m</b>
+     (底版反力の合計 ${n(c.ana.totalReaction)} kＮ/m、差 ${n(c.stability.balance.error, 6)})</p>
+  <div class="figrow">${loadSVG({ ...r, loads: c.loads, ana: c.ana }, 400, 360)}</div>
+
+  <h3>${no}.2 構造解析</h3>
+  <p>部材軸線による閉合ラーメンとしてモデル化し、底版は鉛直地盤反力係数
+     ｋv ＝ ${n(r.input.ground.kv, 0)} kＮ/m³ の弾性床上の梁として直接剛性法で解く。
+     曲げモーメントは内空側引張を正とする。</p>
+  <div class="figrow">${diagramSVG({ ...r, ana: c.ana }, 'M', 400, 360)}${diagramSVG({ ...r, ana: c.ana }, 'S', 400, 360)}</div>
+
+  <h3>${no}.3 各部材の断面力</h3>
+  ${forceTable(r.geo, c.ana)}
+  </section>`;
 }
 
 function buildReport(r) {
   const i = r.input;
-  const s = r.loads.summary;
   const g = r.geo;
-  const mm = (v) => Math.round(v * 1000);
-  const today = new Date().toLocaleDateString('ja-JP');
+  const p = i.project || {};
+  const today = p.date || new Date().toLocaleDateString('ja-JP');
+  const title = p.name || i.title;
 
+  // ---- 表紙 ------------------------------------------------------------
+  const cover = `
+  <section class="cover">
+    <div class="cover-code">${p.code ? `台帳 No. ${esc(p.code)}` : ''}</div>
+    <h1>ＲＣボックスカルバート<br>設 計 計 算 書</h1>
+    <p class="cover-sub">単室(1連) / 道路土工 カルバート工指針 / 許容応力度法</p>
+    <div class="cover-box">
+      ${defRows([
+        ['内空寸法', '内 幅(Ｂ)', `${mm(g.dims.B)}`, 'mm'],
+        ['', '内 高(Ｈ)', `${mm(g.dims.H)}`, 'mm'],
+        ['部材厚', '頂版 Ｔ1', `${mm(g.dims.t1)}`, 'mm'],
+        ['', '底版 Ｔ2', `${mm(g.dims.t2)}`, 'mm'],
+        ['', '側壁 Ｔ3', `${mm(g.dims.t3)}`, 'mm'],
+        ['土被り', 'Ｈ1', n(i.soil.coverMin, 3), 'm'],
+        ['', 'Ｈ2', n(i.soil.coverMax, 3), 'm'],
+        ['活荷重', '', i.live.enabled ? `Ｔ荷重(後輪 ${n(i.live.wheelLoad, 0)} kＮ/輪)` : '考慮しない', ''],
+      ])}
+    </div>
+    <div class="figrow">${sectionSVG(r, 420, 400)}</div>
+    ${table([
+      ['工事名', esc(p.name || '')],
+      ['工区名', esc(p.section || '')],
+      ['設計者', esc(p.designer || '')],
+      ['作成日', esc(today)],
+    ], null, 'meta')}
+    <p class="cover-verdict ${r.verdict.overall ? 'ok' : 'ng'}">
+      総合判定 ${r.verdict.overall ? 'ＯＫ' : 'ＮＧ'}</p>
+  </section>`;
+
+  // ---- 1 設計条件 ------------------------------------------------------
   const conditions = `
-  <h2>1. 設計条件</h2>
-  <h3>1.1 形状</h3>
-  ${table([
-    ['内空寸法', `幅 ${mm(g.dims.B)} mm × 高 ${mm(g.dims.H)} mm`],
-    ['部材厚', `頂版 ${mm(g.dims.t1)} / 底版 ${mm(g.dims.t2)} / 側壁 ${mm(g.dims.t3)} mm`],
-    ['ハンチ', `頂版 ${mm(g.dims.hTh)}×${mm(g.dims.hTv)} / 底版 ${mm(g.dims.hBh)}×${mm(g.dims.hBv)} mm`],
-    ['外形寸法', `幅 ${mm(g.outerW)} mm × 高 ${mm(g.outerH)} mm`],
-    ['設計スパン', `L = B + t3 = ${n(g.L, 3)} m、設計高さ H0 = ${n(g.Hc, 3)} m`],
-    ['コンクリート断面積', `${n(g.solidArea, 4)} m²/m`],
-  ])}
-  <h3>1.2 土質・荷重条件</h3>
-  ${table([
-    ['土被り', `${n(i.soil.cover, 2)} m`],
-    ['単位体積重量', `γ = ${n(i.soil.gamma)} kN/m³、γsat = ${n(i.soil.gammaSat)} kN/m³`],
-    ['静止土圧係数', `K0 = ${n(s.Kl, 2)}(左) / ${n(s.Kr, 2)}(右)`],
-    ['鉛直土圧係数', `α = ${n(s.alpha, 2)}`],
-    ['地下水位', Number.isFinite(s.waterDepth) ? `地表面から ${n(s.waterDepth, 2)} m` : 'なし'],
-    ['内水位', `${n(s.innerWater, 2)} m`],
-    ['活荷重', i.live.enabled ? `T-25(後輪 ${n(i.live.wheelLoad, 0)} kN/輪)` : '考慮しない'],
-  ])}
-  <h3>1.3 材料・地盤</h3>
-  ${table([
-    ['コンクリート', `σck = ${i.material.sigmaCk} N/mm²、Ec = ${n(r.concrete.Ec, 0)} N/mm²`],
-    ['鉄筋', `${i.material.rebarGrade}`],
-    ['許容応力度', `σca = ${n(r.allow.sigmaCa)}、σsa = ${n(r.allow.sigmaSa)}、τa1 = ${n(r.allow.tauA1, 3)} N/mm²`],
-    ['かぶり', `外側 ${i.material.coverOuter} mm / 内側 ${i.material.coverInner} mm`],
-    ['地盤', `kv = ${n(i.ground.kv, 0)} kN/m³、qa = ${n(i.ground.qa, 1)} kN/m²、μ = ${n(i.ground.friction, 2)}`],
-  ])}`;
+  <section class="chapter">
+  <h2>1 設計条件</h2>
 
-  const liveDetail = i.live.enabled ? `
-    <p class="formula">q<sub>L</sub> = 2P(1+i) / (L<sub>a</sub>·L<sub>b</sub>)
-      = 2 × ${n(i.live.wheelLoad, 0)} × (1 + ${n(s.live.impact, 3)})
-      / (${n(s.live.La, 3)} × ${n(s.live.Lb, 3)}) = <b>${n(s.live.q)} kN/m²</b></p>
-    <p class="note">L<sub>a</sub> = a + 2h·tanθ = ${n(i.live.contactA, 2)} + 2 × ${n(i.soil.cover, 2)} × ${n(i.live.tanTheta, 2)} = ${n(s.live.La, 3)} m、
-      L<sub>b</sub> = ${s.live.overlap ? '左右輪の分布が重なるため 輪間隔 + 1輪の分布幅' : '2輪分の分布幅'} = ${n(s.live.Lb, 3)} m、
-      衝撃係数 i = ${n(s.live.impact, 3)}</p>` : '<p>活荷重は考慮しない。</p>';
-
-  const loads = `
-  <h2>2. 荷重の算定</h2>
-  <h3>2.1 躯体自重</h3>
-  <p class="formula">W = A<sub>c</sub> · γ<sub>c</sub> = ${n(g.solidArea, 4)} × ${n(i.material.gammaC)}
-    = <b>${n(s.selfWeight)} kN/m</b></p>
-  <h3>2.2 鉛直土圧</h3>
-  <p class="formula">q<sub>V</sub> = α · σ<sub>v</sub>(h) = ${n(s.alpha, 2)} × ${n(s.sigmaVTop)}
-    = <b>${n(s.earthTop)} kN/m²</b></p>
-  <h3>2.3 活荷重による鉛直土圧</h3>
-  ${liveDetail}
-  <h3>2.4 頂版に作用する鉛直荷重</h3>
-  <p class="formula">q = q<sub>V</sub> + q<sub>L</sub> = ${n(s.earthTop)} + ${n(s.live.q)}
-    = <b>${n(s.qTop)} kN/m²</b></p>
-  <h3>2.5 側方土圧</h3>
-  <p class="formula">σ<sub>h</sub>(z) = K·(σ<sub>v</sub>(z) − u(z)) + u(z) + K·α·q<sub>L</sub></p>
-  ${table([
-    ['側壁上端(頂版中心)', `深さ ${n(s.zTopAxis, 3)} m: 左 ${n(s.lateralTopLeft)} / 右 ${n(s.lateralTopRight)} kN/m²`],
-    ['側壁下端(底版中心)', `深さ ${n(s.zBottomAxis, 3)} m: 左 ${n(s.lateralBottomLeft)} / 右 ${n(s.lateralBottomRight)} kN/m²`],
+  <h3>1.1 一般条件</h3>
+  ${defRows([
+    ['構造形式', '', '一径間ボックスラーメン', ''],
+    ['内空寸法', '(Ｂ)×(Ｈ)', `${mm(g.dims.B)} × ${mm(g.dims.H)}`, 'mm'],
+    ['外形寸法', '', `${mm(g.outerW)} × ${mm(g.outerH)}`, 'mm'],
+    ['設計スパン', 'Ｌ', n(g.L, 3), 'm'],
+    ['設計高さ', 'Ｈo', n(g.Hc, 3), 'm'],
+    ['土被り', 'Ｈ1 〜 Ｈ2', `${n(i.soil.coverMin, 3)} 〜 ${n(i.soil.coverMax, 3)}`, 'm'],
+    ['コンクリート断面積', 'Ａc', n(g.solidArea, 4), 'm²/m'],
   ])}
-  <h3>2.6 水圧・浮力</h3>
-  ${table([
-    ['底版下面の揚圧力', `${n(s.uBottom)} kN/m²`],
-    ['内水重', `${n(s.innerWeight)} kN/m`],
-  ])}
-  <h3>2.7 鉛直方向の釣合い</h3>
-  <p class="formula">ΣV = W + q·L + 内水重 − 揚圧力 = <b>${n(s.totalVertical)} kN/m</b>
-    (底版バネ反力の合計 ${n(r.ana.totalReaction)} kN/m、差 ${n(r.stability.balance.error, 6)})</p>`;
 
+  <h3>1.2 単位体積重量</h3>
+  ${defRows([
+    ['鉄筋コンクリート', 'γc', n(i.material.gammaC), 'kＮ/m³'],
+    ['土(地下水位以上)', 'γs', n(i.soil.gamma), 'kＮ/m³'],
+    ['土(地下水位以下)', 'γsat', n(i.soil.gammaSat), 'kＮ/m³'],
+    ['水', 'γw', n(9.8), 'kＮ/m³'],
+  ])}
+
+  <h3>1.3 土圧係数</h3>
+  ${defRows([
+    ['(水 平)', 'Ｋa', n(i.soil.K0, 3), ''],
+    ['(鉛 直)', 'α', n(i.soil.alpha, 3), ''],
+  ])}
+
+  <h3>1.4 活荷重</h3>
+  ${defRows([
+    ['(上 載)', '', i.live.enabled
+      ? `Ｔ荷重 横断通行 (輪接地幅 a ＝ ${n(i.live.contactA, 2)}m  b ＝ ${n(i.live.contactB, 2)}m)`
+      : '考慮しない', ''],
+    ['   後輪1輪の荷重', 'Ｐ', n(i.live.wheelLoad, 1), 'kＮ'],
+    ['   車両の占有幅', 'Ｗ', n(i.live.occupancyWidth, 2), 'm'],
+    ['   断面力低減係数', 'β', n(i.live.beta, 3), ''],
+    ['(側 載)', 'Ｑ', n(i.live.surcharge), 'kＮ/m²'],
+  ])}
+
+  <h3>1.5 衝撃係数</h3>
+  ${defRows([['', 'ｉ', i.live.impact === null || i.live.impact === undefined
+    ? '土被りに応じて自動算定' : n(i.live.impact, 3), '']])}
+
+  <h3>1.6 鉄筋かぶり</h3>
+  ${defRows([
+    ['(内 側)', '', `${i.material.coverInner}`, 'mm'],
+    ['(外 側)', '', `${i.material.coverOuter}`, 'mm'],
+  ])}
+
+  <h3>1.7 許容応力度</h3>
+  ${defRows([
+    ['鉄筋引張応力度', 'σsa', n(r.allow.sigmaSa, 1), 'Ｎ/mm²'],
+    ['鉄筋降伏点応力度', 'σsy', n(r.rebarGrade.fy, 0), 'Ｎ/mm²'],
+    ['コンクリート 設計基準強度', 'σck', n(i.material.sigmaCk, 1), 'Ｎ/mm²'],
+    ['       曲げ圧縮応力度', 'σca', n(r.allow.sigmaCa, 1), 'Ｎ/mm²'],
+    ['       せん断応力度', 'τa', n(r.allow.tauA1, 3), 'Ｎ/mm²'],
+    ['ヤング係数比', 'ｎ', '15', ''],
+  ])}
+
+  <h3>1.8 標準断面図</h3>
+  <div class="figrow">${sectionSVG(r, 420, 400)}</div>
+
+  <h3>1.9 荷重の組合せ</h3>
+  <p>［荷重 CASE］</p>
+  ${table(r.cases.map((c) => [
+    `CASE-${c.id}`, c.modeLabel, `${n(c.cover, 3)} m`,
+    c.water ? '影響あり' : '影響なし',
+  ]), ['ケース', '載荷位置', '土被り', '地下水'], 'num')}
+  <p class="note">上載 … 荷重がカルバート上載の場合。頂版に鉛直活荷重が載る。<br>
+     側載 … 荷重がカルバート側載の場合。背面の上載荷重 Ｑ による側方土圧のみを考慮する。<br>
+     本計算書は上表の ${r.cases.length} ケースについて行い、断面力の最大値で照査する。</p>
+  </section>`;
+
+  // ---- 2 断面力計算 ----------------------------------------------------
   const forces = `
-  <h2>3. 骨組解析と断面力</h2>
-  <p>部材軸線による閉合ラーメンとしてモデル化し、底版は鉛直地盤反力係数
-     k<sub>v</sub> = ${n(i.ground.kv, 0)} kN/m³ の弾性床上の梁として解いた。
-     曲げモーメントは内空側引張を正とする。</p>
-  <div class="figrow">${diagramSVG(r, 'M', 420, 380)}${diagramSVG(r, 'S', 420, 380)}</div>
-  ${table(r.sections.map((x) => [
-    esc(x.label), n(x.M, 1), n(Math.abs(x.S), 1), n(x.N, 1),
-    x.tensionSide === 'inner' ? '内側' : '外側', `${mm(x.h)}`,
-  ]), ['照査断面', 'M (kN·m/m)', 'S (kN/m)', 'N (kN/m)', '引張側', '部材厚 (mm)'])}`;
+  <section class="chapter">
+  <h2>2 断面力計算</h2>
+  <p>各荷重ケースについて設計荷重を算定し、閉合ラーメンとして構造解析を行って
+     部材の断面力を求める。曲げモーメントの照査位置は支間中央およびハンチ端、
+     せん断力の照査位置はハンチ端とする。</p>
+  </section>
+  ${r.cases.map((c, k) => caseChapter(r, c, k)).join('')}`;
 
+  // ---- 3 断面力集計表 --------------------------------------------------
+  const summary = `
+  <section class="chapter">
+  <h2>3 断面力集計表</h2>
+  <p>各ケースより断面力の最大値を抽出する。</p>
+  ${defRows([
+    ['部材モーメント', 'Ｍ', '', 'kＮ·m'],
+    ['軸力', 'Ｎ', '', 'kＮ'],
+    ['偏位量', 'ｅ ＝ Ｍ/Ｎ', '', 'cm'],
+    ['部材中心軸と鉄筋間距離', 'ｃ', '', 'cm'],
+    ['軸力を考慮した曲げモーメント', 'Ｍs ＝ Ｎ(ｅ+ｃ)/100 ＝ Ｍ + Ｎ·ｃ/100', '', 'kＮ·m'],
+  ])}
+  ${table(r.sections.map((x) => [
+    esc(x.memberName),
+    esc(x.label.replace(x.memberName, '').trim()),
+    x.face === 'inner' ? '内側' : '外側',
+    n(x.M, 3), n(x.N, 3),
+    Number.isFinite(x.check.e) ? n(x.check.e / 10, 2) : '—',
+    n(x.check.c / 10, 2), n(x.check.Ms, 3),
+    `CASE-${x.caseId}`,
+  ]), ['部材', '点', '引張側', 'Ｍ (kN·m)', 'Ｎ (kN)', 'ｅ (cm)', 'ｃ (cm)', 'Ｍs (kN·m)', 'CASE'], 'num')}
+  <p class="note">CASE の列は曲げモーメントを抽出したケースを示す。</p>
+  </section>`;
+
+  // ---- 4 必要鉄筋量 ----------------------------------------------------
   const rebar = `
-  <h2>4. 配筋の決定</h2>
-  <p class="formula">A<sub>s</sub> = M / (σ<sub>sa</sub> · j · d)、
-     j = 1 − x/3d、b·x²/2 = n·A<sub>s</sub>(d − x)、n = 15</p>
-  ${table(r.rebarPlan.map((p) => [
-    `${p.memberName} ${p.faceLabel}`, n(p.M, 1), `${mm(p.h)}`, n(p.cover, 0),
-    n(p.asRequired, 0), n(p.asMinimum, 0),
-    p.selected ? p.selected.label : '候補なし',
-    p.selected ? n(p.selected.As, 0) : '—',
-  ]), ['部材・面', '設計 M', '部材厚 mm', 'かぶり mm', '必要 As', '最小 As', '採用', '配置 As'])}
+  <section class="chapter">
+  <h2>4 必要鉄筋量</h2>
+  <p class="formula">鉄筋の曲げ引張応力度が許容値 σsa に達するときの必要鉄筋量 Ａs を求める。<br>
+     中立軸 ｘ:  Ｎ·ｘ³ − 3(Ｎ·Ｔ/2 − Ｍ)·ｘ² + 6ｎＡs/ｂ·Ｍs·(ｘ − ｄ) ＝ 0<br>
+     σc ＝ 2Ｍs / (ｂ·ｘ·(ｄ − ｘ/3))、  σs ＝ ｎ·σc·(ｄ − ｘ)/ｘ</p>
+  ${table(r.rebarPlan.map((x) => [
+    esc(x.memberName), esc(x.faceLabel),
+    n(x.M, 2), n(x.N, 2), `${mm(x.h)}`, n(x.cover, 0),
+    n(x.asRequired, 0), n(x.asMinimum, 0),
+    x.selected ? esc(x.selected.label) : '<span class="ng">候補なし</span>',
+    x.selected ? n(x.selected.As, 0) : '—',
+    x.caseId ? `CASE-${x.caseId}` : '—',
+  ]), ['部材', '面', '設計Ｍ', 'Ｎ', 'Ｔ (mm)', 'かぶり', '必要Ａs', '最小Ａs', '採用', '配置Ａs', 'CASE'], 'num')}
   <p class="note">配力鉄筋: 必要 ${n(r.distribution.required, 0)} mm²/m →
-     ${r.distribution.selected ? r.distribution.selected.label : '—'}</p>`;
+     ${r.distribution.selected ? esc(r.distribution.selected.label) : '—'}(主鉄筋の 1/3 以上)</p>
+  </section>`;
 
-  const check = `
-  <h2>5. 応力度の照査</h2>
-  <p class="formula">σ<sub>c</sub> = 2M/(b·x·j·d) + N/(b·h)、σ<sub>s</sub> = M/(A<sub>s</sub>·j·d)、
-     τ<sub>m</sub> = S/(b·j·d)</p>
+  // ---- 5 配筋及び実応力度 ----------------------------------------------
+  const stress = `
+  <section class="chapter">
+  <h2>5 配筋及び実応力度</h2>
   ${table(r.sections.map((x) => [
-    esc(x.label), x.rebar ? x.rebar.label : '—',
-    `${n(x.check.d, 1)}`, `${n(x.check.x, 1)}`, `${n(x.check.j, 3)}`,
-    `${n(x.check.sigmaC)} / ${n(r.allow.sigmaCa)}`,
-    `${n(x.check.sigmaS, 1)} / ${n(r.allow.sigmaSa, 1)}`,
-    `${n(x.check.tau, 3)} / ${n(r.allow.tauA1, 3)}`,
-    x.check.ok ? 'OK' : 'NG',
-  ]), ['照査断面', '配筋', 'd mm', 'x mm', 'j', 'σc/σca', 'σs/σsa', 'τm/τa1', '判定'])}`;
+    esc(x.memberName),
+    esc(x.label.replace(x.memberName, '').trim()),
+    x.rebar ? esc(x.rebar.label) : '—',
+    n(x.check.d, 1), n(x.check.x, 1),
+    n(x.check.sigmaC, 2), n(r.allow.sigmaCa, 2),
+    n(x.check.sigmaS, 1), n(r.allow.sigmaSa, 1),
+    x.check.checks.concrete.ok && x.check.checks.steel.ok
+      ? '<b class="ok">CHECK OK</b>' : '<b class="ng">CHECK NG</b>',
+  ]), ['部材', '点', '配筋', 'ｄ (mm)', 'ｘ (mm)', 'σc', 'σca', 'σs', 'σsa', '判定'], 'num')}
+  </section>`;
 
+  // ---- 6 せん断力に対する検討 ------------------------------------------
+  const shear = `
+  <section class="chapter">
+  <h2>6 せん断力に対する検討</h2>
+  <p>照査位置は支点前面から Ｔ/2 の位置とする。その位置がハンチ内にある場合、
+     部材断面の高さはハンチ高さ Ｃ' の 1/3 まで大きくとる。</p>
+  <p class="formula">ｈ' ＝ Ｔ + Ｃ'/3</p>
+
+  <h3>6.1 せん断力照査点の断面力と最大値抽出</h3>
+  ${table(r.shear.map((x) => [
+    esc(x.memberName), esc(x.label.replace(x.memberName, '').trim()),
+    ...r.cases.map((c) => n(x.perCase[c.id] ?? 0, 2)),
+    `<b>${n(Math.abs(x.S), 2)}</b>`, `CASE-${x.caseId}`,
+  ]), ['部材', '点', ...r.cases.map((c) => `CASE-${c.id}`), '最大 Ｓ', 'CASE'], 'num')}
+
+  <h3>6.2 せん断応力度の照査</h3>
+  <p class="formula">τm ＝ Ｓ / (ｂ·ｊ·ｄ) ≦ τa ＝ ${n(r.allow.tauA1, 3)} Ｎ/mm²</p>
+  ${table(r.shear.map((x) => [
+    esc(x.memberName), esc(x.label.replace(x.memberName, '').trim()),
+    n(x.s, 3), mm(x.T), mm(x.haunch), mm(x.hEff),
+    x.rebar ? esc(x.rebar.label) : '—',
+    n(x.check.d, 1), n(Math.abs(x.S), 2), n(x.check.tau, 3), n(r.allow.tauA1, 3),
+    x.check.ok ? '<b class="ok">CHECK OK</b>' : '<b class="ng">CHECK NG</b>',
+  ]), ['部材', '点', '位置 (m)', 'Ｔ (mm)', "Ｃ' (mm)", "ｈ' (mm)", '配筋',
+    'ｄ (mm)', 'Ｓ (kN/m)', 'τm', 'τa', '判定'], 'num')}
+  </section>`;
+
+  // ---- 7 安定・基礎の検討 ----------------------------------------------
   const stability = `
-  <h2>6. 安定・基礎の検討</h2>
-  ${table(r.stability.items.map((x) => [x.label, esc(x.text), x.ok ? 'OK' : 'NG']),
-    ['照査項目', '内容', '判定'])}`;
+  <section class="chapter">
+  <h2>7 安定・基礎の検討</h2>
+  ${table(r.stability.items.map((x) => [
+    esc(x.label), esc(x.text), `CASE-${x.caseId}`,
+    x.ok ? '<b class="ok">CHECK OK</b>' : '<b class="ng">CHECK NG</b>',
+  ]), ['照査項目', '内容', '支配CASE', '判定'])}
+  <p class="note">各荷重ケースについて照査し、最も厳しい結果を示す。</p>
+  </section>`;
 
   const warn = r.warnings.length ? `
-  <h2>7. 確認事項</h2><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : '';
+  <section class="chapter">
+  <h2>8 確認事項</h2><ul>${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>
+  </section>` : '';
 
-  return `<article class="report">
-    <header class="rp-head">
-      <h1>${esc(i.title)}</h1>
-      <p>単室ボックスカルバート(1連) / 道路土工 カルバート工指針 準拠 / 許容応力度法</p>
-      <p class="rp-meta">作成日 ${today} ・ 総合判定 <b>${r.verdict.overall ? 'OK' : 'NG'}</b></p>
-    </header>
-    <div class="figrow">${sectionSVG(r, 420, 380)}${loadSVG(r, 420, 380)}</div>
-    ${conditions}${loads}${forces}${rebar}${check}${stability}${warn}
+  return `<div class="print-header"><span>${esc(title)}</span><span>${esc(p.code || '')}</span></div>
+  <article class="report" data-title="${esc(title)}" data-code="${esc(p.code || '')}">
+    ${cover}${conditions}${forces}${summary}${rebar}${stress}${shear}${stability}${warn}
     <footer class="rp-foot">本計算書は設計の一次検討を目的としたものです。実施設計にあたっては有資格者による確認を行ってください。</footer>
   </article>`;
 }

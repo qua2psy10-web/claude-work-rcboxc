@@ -118,8 +118,44 @@ export function checkSections(geo, ana) {
   for (const key of ['top', 'bottom', 'left', 'right']) {
     const m = geo.memberMap[key];
     add(key, `${m.name} 支間中央`, m.length / 2, 'span');
-    add(key, `${m.name} 端部(始端ハンチ端)`, m.haunchEnd1, 'end');
-    add(key, `${m.name} 端部(終端ハンチ端)`, m.haunchEnd2, 'end');
+    add(key, `${m.name} ハンチ端(始)`, m.haunchEnd1, 'end');
+    add(key, `${m.name} ハンチ端(終)`, m.haunchEnd2, 'end');
+  }
+  return out;
+}
+
+/**
+ * せん断力の照査断面(τ点)。
+ *
+ * 照査位置は支点前面(直交部材の内面)から h/2 の位置とする。
+ * その位置がハンチ内にある場合、部材断面の高さはハンチ高さ C' の 1/3 まで
+ * 大きくとってよい(参照した実務の計算書による)。
+ *
+ *   h' = T + C'/3      C' はその位置におけるハンチの高さ
+ *
+ * ハンチが T/2 以下の場合、照査位置がハンチ端の外に出るため C' = 0 となり、
+ * 基本厚 T のままとなる。
+ */
+export function shearSections(geo, ana) {
+  const out = [];
+  for (const key of ['top', 'bottom', 'left', 'right']) {
+    const m = geo.memberMap[key];
+    const T = m.t;
+    const spots = [
+      { label: `${m.name} τ点(始端)`, s: Math.min(m.face1 + T / 2, m.length / 2) },
+      { label: `${m.name} τ点(終端)`, s: Math.max(m.face2 - T / 2, m.length / 2) },
+    ];
+    for (const spot of spots) {
+      const f = ana.forceAt(key, spot.s);
+      const hAt = m.heightAt(spot.s);
+      const haunch = Math.max(0, hAt - T);   // C'
+      const hEff = T + haunch / 3;           // h'
+      out.push({
+        member: key, memberName: m.name, label: spot.label, s: spot.s,
+        T, haunch, hEff, h: hEff,
+        M: f.M, S: f.S, N: f.N,
+      });
+    }
   }
   return out;
 }

@@ -136,10 +136,13 @@ export function buildGeometry(dims, opts = {}) {
     const uy = (b.y - a.y) / d.length;
     const heightAt = makeHeightFn(d.t, d.length, d.e1, d.e2);
 
-    // ハンチ端・支点前面などを分割の切れ目として必ず含める
+    // ハンチ端・支点前面・せん断照査位置(支点前面から t/2)を
+    // 分割の切れ目として必ず含める。照査位置が節点に乗ることで、
+    // 断面力を補間せずに取り出せ、左右対称性も厳密に保たれる。
     const key = [
       d.e1.joint, d.e1.joint + d.e1.taper,
       d.length - d.e2.joint - d.e2.taper, d.length - d.e2.joint,
+      d.e1.joint + d.t / 2, d.length - d.e2.joint - d.t / 2,
       ...d.breaks,
     ];
     const bp = cleanBreakpoints(key, d.length);

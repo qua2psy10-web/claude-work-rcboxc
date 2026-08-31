@@ -1,0 +1,11 @@
+{
+  "name": "rc-box-culvert-design",
+  "version": "0.1.0",
+  "description": "道路土工カルバート工指針に準拠した単室RCボックスカルバートの設計計算アプリ",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node build.js"
+  }
+}

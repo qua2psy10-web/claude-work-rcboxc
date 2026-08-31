@@ -7,6 +7,12 @@
  *   3. 活荷重による鉛直土圧(T-25 後輪荷重の分布、衝撃を含む)
  *   4. 側方土圧(静止土圧、地下水位以下は有効応力+水圧)
  *   5. 活荷重による側方土圧
+ *
+ * 活荷重の載荷位置(live.mode)
+ *   'top'  上載 … 輪荷重がカルバート直上にある。頂版に鉛直活荷重が載り、
+ *                 側壁には活荷重による上載荷重を考慮しない。
+ *   'side' 側載 … 荷重がカルバート側方にある。頂版に鉛直活荷重は載らず、
+ *                 背面の上載荷重 Q(群集荷重)による側方土圧のみを考慮する。
  *   6. 外水圧・揚圧力(浮力)、内水重・内水圧
  *   7. 底版反力 → 弾性床(鉛直バネ)として与えるため荷重としては扱わない
  *
@@ -125,16 +131,21 @@ export function buildLoads(geo, cond) {
   const earthTop = alpha * sigmaVTop;  // 頂版上面に作用する全鉛直圧 kN/m2
 
   // ---- 3. 活荷重 --------------------------------------------------------
-  const live = cond.live.enabled
+  const mode = cond.live.mode ?? 'top';
+  const live = cond.live.enabled && mode === 'top'
     ? liveLoadPressure(cover, cond.live)
-    : { q: 0, impact: 0, La: 0, Lb: 0, overlap: false, note: '活荷重は考慮しない設定です。' };
-  if (live.note) warnings.push(live.note);
+    : { q: 0, impact: 0, La: 0, Lb: 0, overlap: false, note: '' };
+  if (cond.live.enabled && mode === 'top' && live.note) warnings.push(live.note);
+  // 側載時は背面の上載荷重(群集荷重)のみを考慮する
+  const surcharge = cond.live.enabled && mode === 'side'
+    ? (cond.live.surcharge ?? 10)
+    : 0;
 
   const qTop = earthTop + live.q; // 頂版に載る鉛直荷重 kN/m2
   for (const id of geo.memberMap.top.elemIds) push(id, 0, -qTop, 0, -qTop);
 
-  // ---- 4,5. 側方土圧(活荷重ぶんを含む) --------------------------------
-  const liveLateral = live.q; // 上載荷重として扱う
+  // ---- 4,5. 側方土圧(側載時の上載荷重ぶんを含む) ------------------------
+  const liveLateral = surcharge;
   const wallPressure = (z, K) =>
     lateralStress(z, soil, K) + K * alpha * liveLateral;
 
@@ -204,7 +215,7 @@ export function buildLoads(geo, cond) {
     zTop, zBottom, zTopAxis, zBottomAxis,
     waterDepth: soil.waterDepth,
     sigmaVTop, uTop, earthTop,
-    live,
+    live, liveMode: mode, surcharge,
     qTop,
     lateralTopLeft: wallPressure(zTopAxis, Kl),
     lateralBottomLeft: wallPressure(zBottomAxis, Kl),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { design, defaultInput, validate } from '../src/core/design.js';
+import { design, defaultInput, validate, buildCases, normalizeInput } from '../src/core/design.js';
 import { requiredAs, checkSection, neutralAxis } from '../src/core/rc.js';
 import { selectRebar, arrangement } from '../src/core/rebar.js';
 
@@ -12,25 +12,85 @@ const at = (r, key, s) =>
 
 /** 代表的な荷重条件のバリエーション */
 const cases = {
-  '標準(土被り1m)': (i) => i,
+  '標準': (i) => i,
   '地下水位あり': (i) => { i.soil.waterLevel = 0.5; return i; },
   '内水位あり': (i) => { i.water.innerLevel = 1.5; return i; },
-  '活荷重なし・土被り5m': (i) => { i.soil.cover = 5.0; i.live.enabled = false; return i; },
+  '活荷重なし・土被り5m': (i) => { i.soil.coverMin = 5.0; i.soil.coverMax = 5.0; i.live.enabled = false; return i; },
   '偏土圧': (i) => { i.soil.K0Left = 0.6; i.soil.K0Right = 0.4; return i; },
   '突出形(α=1.2)': (i) => { i.soil.alpha = 1.2; return i; },
 };
 
 for (const [name, mod] of Object.entries(cases)) {
-  test(`鉛直方向の釣合い検算: ${name}`, () => {
+  test(`鉛直方向の釣合い検算(全ケース): ${name}`, () => {
     const r = design(mod(defaultInput()));
     assert.ok(r.ok, '計算が成立すること');
-    const s = r.loads.summary;
-    close(r.ana.totalReaction, s.totalVertical, Math.abs(s.totalVertical) * 1e-6 + 1e-6,
-      '底版バネ反力の合計と載荷重の合計');
-    assert.ok(r.stability.balance.error < 1e-6 * Math.max(1, Math.abs(s.totalVertical)),
-      '釣合い誤差が十分小さいこと');
+    for (const c of r.cases) {
+      const s = c.loads.summary;
+      close(c.ana.totalReaction, s.totalVertical, Math.abs(s.totalVertical) * 1e-6 + 1e-6,
+        `CASE-${c.id} の底版バネ反力の合計と載荷重の合計`);
+      assert.ok(c.stability.balance.error < 1e-6 * Math.max(1, Math.abs(s.totalVertical)),
+        `CASE-${c.id} の釣合い誤差が十分小さいこと`);
+    }
   });
 }
+
+test('荷重ケース: 3軸の組合せが参照帳票の番号順で生成される', () => {
+  const i = defaultInput();
+  const c = buildCases(i);
+  assert.equal(c.length, 4, '地下水を考慮しなければ4ケース');
+  assert.deepEqual(c.map((x) => [x.id, x.mode, x.cover]),
+    [[1, 'top', 1.0], [2, 'side', 1.0], [3, 'top', 3.0], [4, 'side', 3.0]]);
+
+  i.soil.waterLevel = 0.5;
+  const c8 = buildCases(i);
+  assert.equal(c8.length, 8, '地下水を考慮すると8ケース');
+  assert.deepEqual(c8.slice(4).map((x) => x.water), [true, true, true, true],
+    'CASE-5〜8 が地下水ありであること');
+});
+
+test('荷重ケース: 土被りが最小=最大なら重複ケースを畳む', () => {
+  const i = defaultInput();
+  i.soil.coverMax = i.soil.coverMin;
+  assert.equal(buildCases(i).length, 2, '上載・側載の2ケースになる');
+  i.live.enabled = false;
+  assert.equal(buildCases(i).length, 1, '活荷重なしなら1ケース');
+});
+
+test('包絡: 各断面の設計値は全ケースの値以上で、支配CASEが一致する', () => {
+  const r = design(defaultInput());
+  for (const sec of r.sections) {
+    let maxAbs = 0;
+    let argmax = null;
+    for (const c of r.cases) {
+      const m = c.sections.find((x) => x.label === sec.label && x.tensionSide === sec.face);
+      if (m && Math.abs(m.M) > maxAbs) { maxAbs = Math.abs(m.M); argmax = c.id; }
+    }
+    close(Math.abs(sec.M), maxAbs, 1e-9, `${sec.label}(${sec.face}) の包絡値`);
+    assert.equal(sec.caseId, argmax, `${sec.label}(${sec.face}) の支配CASE`);
+  }
+});
+
+test('後方互換: 旧形式の soil.cover のみの入力でも動作する', () => {
+  const old = defaultInput();
+  delete old.soil.coverMin;
+  delete old.soil.coverMax;
+  delete old.project;
+  old.soil.cover = 1.5;
+  const n = normalizeInput(old);
+  close(n.soil.coverMin, 1.5, 1e-12, 'coverMin に読み替え');
+  close(n.soil.coverMax, 1.5, 1e-12, 'coverMax に読み替え');
+  assert.ok(n.project, 'project が補われること');
+  assert.equal(design(n).ok, true, '計算が成立すること');
+});
+
+test('軸力を考慮した曲げモーメント Ms = M + N·c が成り立つ', () => {
+  const r = design(defaultInput());
+  for (const sec of r.sections) {
+    const c = sec.check.d - (sec.h * 1000) / 2;   // 部材中心軸と鉄筋間距離 mm
+    const expected = Math.abs(sec.M) + (sec.N * c) / 1000; // kN·m
+    close(sec.check.Ms, expected, 1e-6 * Math.max(1, expected), `${sec.label} の Ms`);
+  }
+});
 
 test('隅角部で接合する2部材の曲げモーメントが釣り合う', () => {
   const r = design(defaultInput());
@@ -67,7 +127,7 @@ test('偏土圧では不均衡水平力が生じ、水平力照査が意味を�
   const r = design(cases['偏土圧'](defaultInput()));
   const slide = r.stability.items.find((i) => i.key === 'slide');
   assert.ok(Number.isFinite(slide.value), '安全率が有限値になること');
-  assert.ok(Math.abs(r.ana.totalHorizontal) > 1, '正味の水平力が生じること');
+  assert.ok(Math.abs(r.cases[0].ana.totalHorizontal) > 1, '正味の水平力が生じること');
   // 左右の曲げモーメントに差が出る
   const dl = at(r, 'left', r.geo.Hc / 2).M;
   const dr = at(r, 'right', r.geo.Hc / 2).M;
@@ -80,19 +140,26 @@ test('地下水位が高い場合は揚圧力と浮上り安全率が計算さ�
   const r = design(input);
   const uplift = r.stability.items.find((i) => i.key === 'uplift');
   assert.ok(uplift.value > 0 && Number.isFinite(uplift.value), '浮上り安全率が算定されること');
-  assert.ok(r.loads.summary.uBottom > 0, '揚圧力が生じること');
+  const wet = r.cases.filter((c) => c.water);
+  assert.equal(wet.length, 4, '地下水ありのケースが4つ生成されること');
+  assert.ok(wet.every((c) => c.loads.summary.uBottom > 0), '地下水ありのケースで揚圧力が生じること');
+  assert.ok(r.cases.filter((c) => !c.water).every((c) => c.loads.summary.uBottom === 0),
+    '地下水なしのケースでは揚圧力が生じないこと');
   // 抵抗力 = 自重 + 上載土重 + 内水重
   const p = uplift.parts;
   close(p.selfWeight + p.coverWeight + p.innerWeight, uplift.value * p.uplift, 1e-6, '安全率の内訳');
 });
 
-test('土被りを増やすと断面力が増え、活荷重の寄与は減る', () => {
-  const shallow = design((() => { const i = defaultInput(); i.soil.cover = 1.0; return i; })());
-  const deep = design((() => { const i = defaultInput(); i.soil.cover = 5.0; return i; })());
-  assert.ok(deep.loads.summary.live.q < shallow.loads.summary.live.q, '活荷重圧は土被りとともに減少');
-  assert.ok(deep.loads.summary.qTop > shallow.loads.summary.qTop, '頂版の全荷重は増加');
-  assert.ok(Math.abs(at(deep, 'top', deep.geo.L / 2).M) > Math.abs(at(shallow, 'top', shallow.geo.L / 2).M),
-    '頂版の曲げモーメントが増加');
+test('土被りを増やすと鉛直荷重が増え、活荷重の寄与は減る', () => {
+  const one = (cover) => {
+    const i = defaultInput();
+    i.soil.coverMin = cover; i.soil.coverMax = cover;
+    return design(i).cases[0].loads.summary; // 上載ケース
+  };
+  const shallow = one(1.0);
+  const deep = one(5.0);
+  assert.ok(deep.live.q < shallow.live.q, '活荷重圧は土被りとともに減少');
+  assert.ok(deep.qTop > shallow.qTop, '頂版の全荷重は増加');
 });
 
 test('必要鉄筋量で配筋すると鉄筋応力度が許容値付近に収まる', () => {
@@ -130,19 +197,24 @@ test('入力チェック: 不正な入力はエラーとして返る', () => {
 
 test('標準ケースの回帰(ゴールデン値)', () => {
   const r = design(defaultInput());
-  const s = r.loads.summary;
+  const c1 = r.cases[0]; // CASE-1: 上載・土被り1.0m
+  const s = c1.loads.summary;
+  const m = (key, pos) =>
+    c1.ana.diagrams[key].reduce((b, p) => (Math.abs(p.s - pos) < Math.abs(b.s - pos) ? p : b)).M;
+
   close(s.selfWeight, 68.7225, 1e-3, '自重');
   close(s.live.q, 32.0856, 1e-3, '活荷重圧');
   close(s.qTop, 51.0856, 1e-3, '頂版鉛直荷重');
   close(s.totalVertical, 186.2193, 1e-3, '全鉛直荷重');
-  close(r.ana.maxReactionPressure, 85.043, 1e-2, '最大地盤反力度');
+  close(c1.ana.maxReactionPressure, 86.495, 1e-2, '最大地盤反力度');
 
-  close(at(r, 'top', r.geo.L / 2).M, 16.103, 1e-2, '頂版中央の曲げモーメント');
-  close(at(r, 'bottom', r.geo.L / 2).M, 19.203, 1e-2, '底版中央の曲げモーメント');
-  close(at(r, 'top', 0).M, -22.717, 1e-2, '頂版隅角の曲げモーメント');
-  close(at(r, 'bottom', 0).M, -28.444, 1e-2, '底版隅角の曲げモーメント');
-  close(at(r, 'left', r.geo.Hc / 2).M, -0.524, 1e-2, '側壁中央の曲げモーメント');
+  close(m('top', r.geo.L / 2), 20.051, 1e-2, '頂版中央の曲げモーメント');
+  close(m('bottom', r.geo.L / 2), 23.024, 1e-2, '底版中央の曲げモーメント');
+  close(m('top', 0), -18.769, 1e-2, '頂版隅角の曲げモーメント');
+  close(m('bottom', 0), -24.373, 1e-2, '底版隅角の曲げモーメント');
+  close(m('left', r.geo.Hc / 2), -7.122, 1e-2, '側壁中央の曲げモーメント');
 
-  assert.equal(r.sections.length, 12, '照査断面の数');
+  assert.equal(r.cases.length, 4, '荷重ケースの数');
+  assert.equal(r.sections.length, 14, '包絡した照査断面の数');
   assert.equal(r.verdict.stability, true, '安定照査は成立');
 });

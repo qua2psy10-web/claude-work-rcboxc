@@ -45,24 +45,41 @@ test('土中応力: 地下水位を挟んだ全応力・水圧・側方応力', 
 
 test('荷重算定: 頂版荷重と側壁土圧が手計算と一致する', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin; // 1ケース分の条件に落とす
+  input.live.mode = 'top';
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
   const { summary } = buildLoads(geo, input);
 
   close(summary.earthTop, 19 * 1.0, 1e-9, '頂版上面の鉛直土圧 γ·h');
   close(summary.qTop, 19 + summary.live.q, 1e-9, '頂版の鉛直荷重');
 
-  // 頂版中心線の深さ = 土被り + 頂版厚/2 = 1.0 + 0.15
+  // 上載ケースでは側方に活荷重ぶんの上載荷重を考慮しない(側載ケースで考慮する)
   const zTopAxis = 1.0 + 0.15;
-  const expectTop = 0.5 * 19 * zTopAxis + 0.5 * summary.live.q;
-  close(summary.lateralTopLeft, expectTop, 1e-9, '側壁上端の側方土圧');
+  close(summary.lateralTopLeft, 0.5 * 19 * zTopAxis, 1e-9, '側壁上端の側方土圧');
 
   // 底版中心線の深さ = 1.0 + 外形高 - 底版厚/2
   const zBotAxis = 1.0 + geo.outerH - 0.15;
-  close(summary.lateralBottomLeft, 0.5 * 19 * zBotAxis + 0.5 * summary.live.q, 1e-9, '側壁下端の側方土圧');
+  close(summary.lateralBottomLeft, 0.5 * 19 * zBotAxis, 1e-9, '側壁下端の側方土圧');
+});
+
+test('荷重算定: 側載では鉛直活荷重が載らず、側方に上載荷重が加わる', () => {
+  const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'side';
+  input.live.surcharge = 10;
+  const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
+  const { summary } = buildLoads(geo, input);
+
+  close(summary.qTop, 19 * 1.0, 1e-9, '頂版には土圧のみが載る');
+  close(summary.live.q, 0, 1e-12, '鉛直活荷重はゼロ');
+  const zTopAxis = 1.0 + 0.15;
+  close(summary.lateralTopLeft, 0.5 * 19 * zTopAxis + 0.5 * 10, 1e-9, '側方に上載荷重 K·Q が加わる');
 });
 
 test('荷重算定: 地下水位以下では揚圧力と浮力が計上される', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'top';
   input.soil.waterLevel = 0.5; // GL-0.5m
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 8 });
   const { summary } = buildLoads(geo, input);
@@ -74,6 +91,8 @@ test('荷重算定: 地下水位以下では揚圧力と浮力が計上される
 
 test('荷重算定: 自重が実断面から求めた重量と整合する', () => {
   const input = defaultInput();
+  input.soil.cover = input.soil.coverMin;
+  input.live.mode = 'top';
   const geo = buildGeometry(input.dims, { sigmaCk: input.material.sigmaCk, divisions: 24 });
   const { summary } = buildLoads(geo, input);
   close(summary.selfWeight, geo.selfWeight, 1e-6, '自重の合計');

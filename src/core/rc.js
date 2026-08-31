@@ -95,12 +95,15 @@ export function checkSection(p) {
       value: sigmaS, allow: p.allow.sigmaSa, unit: 'N/mm²',
       ratio: ratio(sigmaS, p.allow.sigmaSa),
     },
-    shear: {
+  };
+  // せん断はハンチを考慮した別の照査位置で行うため、既定では曲げのみを判定する
+  if (!p.skipShear) {
+    checks.shear = {
       label: '平均せん断応力度',
       value: tau, allow: p.allow.tauA1, unit: 'N/mm²',
       ratio: ratio(tau, p.allow.tauA1),
-    },
-  };
+    };
+  }
   for (const c of Object.values(checks)) c.ok = c.ratio <= 1.0 + 1e-9;
 
   return {
@@ -159,6 +162,32 @@ export function requiredAsAxial(M, N, h, cover, barDia, sigmaSa, b = 1000, n = Y
     if (stress(mid) > sigmaSa) lo = mid; else hi = mid;
   }
   return hi;
+}
+
+/**
+ * せん断応力度の照査。
+ * 有効断面高 h は呼び出し側で決める(ハンチ部では h' = T + C'/3)。
+ * 中立軸は曲げのみの式で求め、τm = S / (b·j·d) とする。
+ */
+export function checkShear(p) {
+  const b = p.b ?? 1000;
+  const n = p.n ?? YOUNG_RATIO;
+  const d = p.h - p.cover - p.barDia / 2;
+  const S = Math.abs(p.S) * 1e3; // kN → N
+  const x = neutralAxis(b, d, p.As, n);
+  const j = 1 - x / (3 * d);
+  const z = j * d;
+  const tau = z > 0 ? S / (b * z) : Infinity;
+  const ratio = p.allow.tauA1 > 0 ? tau / p.allow.tauA1 : Infinity;
+  return {
+    d, x, j, z, tau,
+    check: {
+      label: '平均せん断応力度',
+      value: tau, allow: p.allow.tauA1, unit: 'N/mm²',
+      ratio, ok: ratio <= 1.0 + 1e-9,
+    },
+    ok: ratio <= 1.0 + 1e-9,
+  };
 }
 
 /** 最小鉄筋量(既定: 有効断面 b·d の 0.2%) */

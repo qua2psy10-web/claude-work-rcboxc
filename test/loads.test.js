@@ -16,19 +16,23 @@ test('衝撃係数: 土被りによる区分', () => {
   close(impactFactor(10), 0, 1e-12, 'h=10');
 });
 
-test('活荷重: 分布幅と圧力が手計算と一致する(土被り1.0m)', () => {
-  const r = liveLoadPressure(1.0);
-  // La = 0.2 + 2*1.0*1.0 = 2.2 / 1輪の分布幅 Lb0 = 0.5 + 2.0 = 2.5 > 1.75 → 重なる
-  close(r.La, 2.2, 1e-12, '進行方向の分布長');
-  close(r.Lb, 1.75 + 2.5, 1e-12, '直角方向の合成分布幅');
-  assert.equal(r.overlap, true);
-  close(r.q, (2 * 100 * 1.5) / (2.2 * 4.25), 1e-9, '活荷重圧');
+test('活荷重: 参照帳票と同条件で分布幅・輪荷重・鉛直土圧が一致する', () => {
+  // 帳票の値: a=0.20 b=0.50 H=0.200 i=0.300 β=0.9 P=100 → u=0.600 v=0.900
+  //           Pl=117.000 kN、Pvl=141.818 kN/m2
+  const r = liveLoadPressure(0.2, { impact: 0.3, beta: 0.9 });
+  close(r.u, 0.6, 1e-12, '輪分布幅 u = a + 2H·tanθ');
+  close(r.v, 0.9, 1e-12, '輪分布幅 v = b + 2H·tanθ');
+  close(r.Pl, 117.0, 1e-9, '活荷重 Pl = P(1+i)β');
+  close(r.q, (2 * 117.0) / 2.75 / 0.6, 1e-9, '鉛直土圧 Pvl = 2Pl/W/u');
+  close(r.q, 141.818, 1e-3, '帳票の Pvl');
 });
 
-test('活荷重: 分布幅が重ならない浅い土被り', () => {
-  const r = liveLoadPressure(0.5);
-  close(r.Lb, 2 * (0.5 + 1.0), 1e-12, '重ならない場合は2輪分の幅');
-  assert.ok(r.note.includes('0.5m 未満') === false);
+test('活荷重: 断面力低減係数と占有幅が効く', () => {
+  const base = liveLoadPressure(1.0, { impact: 0.5, beta: 1.0 });
+  const withBeta = liveLoadPressure(1.0, { impact: 0.5, beta: 0.9 });
+  close(withBeta.q, base.q * 0.9, 1e-9, 'β に比例して低減される');
+  const wide = liveLoadPressure(1.0, { impact: 0.5, occupancyWidth: 5.5 });
+  close(wide.q, base.q / 2, 1e-9, '占有幅に反比例する');
 });
 
 test('土中応力: 地下水位を挟んだ全応力・水圧・側方応力', () => {

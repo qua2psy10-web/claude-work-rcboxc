@@ -20,8 +20,8 @@
 
 import { buildGeometry } from './geometry.js';
 import { buildLoads } from './loads.js';
-import { analyze, checkSections } from './analyze.js';
-import { checkSection, requiredAsAxial, minimumAs, concreteCapacityMoment } from './rc.js';
+import { analyze, checkSections, shearSections } from './analyze.js';
+import { checkSection, checkShear, requiredAsAxial, minimumAs, concreteCapacityMoment } from './rc.js';
 import { selectRebar, distributionRebar, arrangement } from './rebar.js';
 import { checkStability } from './stability.js';
 import { concreteProps, rebarProps, GAMMA_C } from './units.js';
@@ -56,8 +56,10 @@ export function defaultInput() {
     live: {
       enabled: true,
       wheelLoad: 100, contactA: 0.2, contactB: 0.5,
-      wheelSpacing: 1.75, tanTheta: 1.0,
+      tanTheta: 1.0,
       impact: null,      // null で土被りから自動算定
+      occupancyWidth: 2.75, // 車両の占有幅 m
+      beta: 1.0,         // 断面力低減係数
       surcharge: 10.0,   // 側載時の上載荷重(群集荷重) kN/m2
     },
     water: { innerLevel: 0 }, // 内水位(内空底面から)m
@@ -256,8 +258,9 @@ export function design(rawInput) {
     const loads = buildLoads(geo, cond);
     const ana = analyze(geo, loads);
     const sections = checkSections(geo, ana);
+    const shear = shearSections(geo, ana);
     const stability = checkStability(geo, loads, ana, cond);
-    return { ...c, cond, loads, ana, sections, stability };
+    return { ...c, cond, loads, ana, sections, shear, stability };
   });
   for (const s of solved) {
     for (const w of s.loads.warnings) warnings.push(`CASE-${s.id}: ${w}`);
@@ -279,22 +282,21 @@ export function design(rawInput) {
           M: sec.M, N: sec.N, S: sec.S, caseId: s.id, caseLabel: s.label,
         });
       }
-      const skey = `${sec.member}|${sec.label}`;
-      const sprev = shearEnvelope.get(skey);
-      if (!sprev || Math.abs(sec.S) > Math.abs(sprev.S)) {
-        shearEnvelope.set(skey, {
-          member: sec.member, memberName: sec.memberName, label: sec.label,
-          h: sec.h, S: sec.S, M: sec.M, N: sec.N, caseId: s.id,
-          perCase: {},
-        });
+    }
+    // せん断は τ点(支点前面から h/2、ハンチ考慮の h')で別に包絡する
+    for (const t of s.shear) {
+      const skey = `${t.member}|${t.label}`;
+      const prev = shearEnvelope.get(skey);
+      if (!prev || Math.abs(t.S) > Math.abs(prev.S)) {
+        shearEnvelope.set(skey, { ...t, caseId: s.id, perCase: prev ? prev.perCase : {} });
       }
     }
   }
-  // せん断はケース別の値も帳票に出すため保持する
+  // ケース別の値も帳票に出すため保持する
   for (const s of solved) {
-    for (const sec of s.sections) {
-      const e = shearEnvelope.get(`${sec.member}|${sec.label}`);
-      if (e) e.perCase[s.id] = sec.S;
+    for (const t of s.shear) {
+      const e = shearEnvelope.get(`${t.member}|${t.label}`);
+      if (e) e.perCase[s.id] = t.S;
     }
   }
   const enveloped = [...envelope.values()];
@@ -337,7 +339,7 @@ export function design(rawInput) {
     const chk = checkSection({
       M: e.M, S: e.S, N: e.N,
       h: e.h * 1000, cover: d.cover, barDia: d.selected ? d.selected.dia : 16,
-      As, allow,
+      As, allow, skipShear: true,
     });
     return { ...e, rebar: d.selected, cover: d.cover, check: chk };
   });
@@ -353,9 +355,24 @@ export function design(rawInput) {
       warnings.push(`${d.memberName} ${d.faceLabel}: 曲げモーメント ${d.M.toFixed(1)} kN·m/m が単鉄筋断面の抵抗上限 ${d.concreteCapacity.toFixed(1)} kN·m/m を超えます。部材厚の増加または圧縮鉄筋の配置が必要です。`);
     }
   }
-  for (const r of results) {
-    if (!r.check.checks.shear.ok) {
-      warnings.push(`${r.label}: 平均せん断応力度 ${r.check.tau.toFixed(3)} N/mm² が許容値 ${allow.tauA1.toFixed(3)} N/mm² を超えます。部材厚の増加またはハンチの拡大を検討してください。`);
+  // ---- せん断の照査(τ点) -----------------------------------------------
+  const shearResults = [...shearEnvelope.values()].map((t) => {
+    const face = t.M >= 0 ? 'inner' : 'outer';
+    const d = designMap.get(`${t.member}:${face}`);
+    const As = d && d.selected ? d.selected.As : 0;
+    const chk = checkShear({
+      S: t.S, h: t.hEff * 1000, cover: d.cover,
+      barDia: d.selected ? d.selected.dia : 16, As, allow,
+    });
+    return { ...t, face, rebar: d.selected, cover: d.cover, check: chk };
+  });
+  shearResults.sort((a, b) => {
+    const order = ['top', 'bottom', 'left', 'right'];
+    return order.indexOf(a.member) - order.indexOf(b.member) || a.s - b.s;
+  });
+  for (const t of shearResults) {
+    if (!t.check.ok) {
+      warnings.push(`${t.label}: 平均せん断応力度 ${t.check.tau.toFixed(3)} N/mm² が許容値 ${allow.tauA1.toFixed(3)} N/mm² を超えます。部材厚の増加またはハンチの拡大を検討してください。`);
     }
   }
 
@@ -370,7 +387,8 @@ export function design(rawInput) {
 
   const mainAsMax = Math.max(...designed.map((d) => (d.selected ? d.selected.As : 0)));
   const distribution = distributionRebar(mainAsMax, options.rebar);
-  const sectionOk = results.every((r) => r.check.ok);
+  const bendingOk = results.every((r) => r.check.ok);
+  const shearOk = shearResults.every((t) => t.check.ok);
 
   return {
     ok: true,
@@ -386,16 +404,21 @@ export function design(rawInput) {
     loads: solved[0].loads,
     ana: solved[0].ana,
     sections: results,
-    shear: [...shearEnvelope.values()],
+    shear: shearResults,
     rebarPlan: designed,
     distribution,
     stability,
     warnings: [...new Set(warnings)],
     verdict: {
-      section: sectionOk,
+      bending: bendingOk,
+      shear: shearOk,
+      section: bendingOk && shearOk,
       stability: stability.ok,
-      overall: sectionOk && stability.ok,
-      maxRatio: Math.max(...results.map((r) => r.check.maxRatio)),
+      overall: bendingOk && shearOk && stability.ok,
+      maxRatio: Math.max(
+        ...results.map((r) => r.check.maxRatio),
+        ...shearResults.map((t) => t.check.check.ratio),
+      ),
     },
   };
 }

@@ -32,25 +32,32 @@ export function impactFactor(cover) {
 }
 
 /**
- * 活荷重(T-25)による鉛直土圧
- * 後輪荷重 P を接地面 a×b から分布角 θ で分散させ、
- * 1後軸の左右2輪ぶんを合成した平均圧力として与える。
+ * 活荷重による鉛直土圧
  *
- * @returns {{q:number, impact:number, La:number, Lb:number, overlap:boolean, note:string}}
+ * 実務の設計計算書で用いられる式による。
+ *   輪分布幅   ｕ ＝ a + 2H·tanθ      (進行方向)
+ *              ｖ ＝ b + 2H·tanθ      (車両直角方向。参考値)
+ *   活荷重     Ｐl  ＝ Ｐ(1+i)·β
+ *              Ｐvl ＝ 2·Ｐl / Ｗ / ｕ
+ * ここに Ｐ は後輪1輪の荷重(T-25 で 0.4×T ＝ 100 kN)、Ｗ は車両の占有幅(2.75 m)、
+ * i は衝撃係数、β は断面力低減係数。
+ *
+ * @returns {{q:number, impact:number, beta:number, u:number, v:number,
+ *            Pl:number, occupancy:number, note:string}}
  */
 export function liveLoadPressure(cover, o = {}) {
-  const P = o.wheelLoad ?? 100;        // 後輪1輪の荷重 kN(T-25)
-  const a = o.contactA ?? 0.2;         // 接地長(進行方向) m
-  const b = o.contactB ?? 0.5;         // 接地幅(車両直角方向) m
-  const spacing = o.wheelSpacing ?? 1.75; // 左右輪の中心間隔 m
-  const tanTheta = o.tanTheta ?? 1.0;  // 分布角(既定 45°)
+  const P = o.wheelLoad ?? 100;           // 後輪1輪の荷重 kN(T-25 で 0.4×250)
+  const a = o.contactA ?? 0.2;            // 接地長(進行方向) m
+  const b = o.contactB ?? 0.5;            // 接地幅(車両直角方向) m
+  const tanTheta = o.tanTheta ?? 1.0;     // 分布角(既定 45°)
+  const W = o.occupancyWidth ?? 2.75;     // 車両の占有幅 m
+  const beta = o.beta ?? 1.0;             // 断面力低減係数
   const i = o.impact ?? impactFactor(cover);
 
-  const La = a + 2 * cover * tanTheta;      // 進行方向の分布長
-  const Lb0 = b + 2 * cover * tanTheta;     // 1輪の直角方向分布幅
-  const overlap = Lb0 > spacing;
-  const Lb = overlap ? spacing + Lb0 : 2 * Lb0;
-  const q = (2 * P * (1 + i)) / (La * Lb);
+  const u = a + 2 * cover * tanTheta;
+  const v = b + 2 * cover * tanTheta;
+  const Pl = P * (1 + i) * beta;
+  const q = (2 * Pl) / W / u;
 
   let note = '';
   if (cover < 0.5) {
@@ -59,7 +66,7 @@ export function liveLoadPressure(cover, o = {}) {
   } else if (cover >= 6.5) {
     note = '土被りが大きく衝撃を考慮しない範囲です。';
   }
-  return { q, impact: i, La, Lb, overlap, note };
+  return { q, impact: i, beta, u, v, Pl, occupancy: W, note };
 }
 
 /** 深さ z における全鉛直応力・間隙水圧 */

@@ -65,12 +65,14 @@ function caseChapter(r, c, idx) {
   const s = c.loads.summary;
   const no = `2.${idx + 1}`;
   const live = s.liveMode === 'top' && s.live.q > 0 ? `
-    <p class="formula">(3) 活荷重 Ｐvl ＝ 2Ｐ(1+i) / (Ｌa · Ｌb)
-      ＝ 2 × ${n(r.input.live.wheelLoad, 0)} × (1 + ${n(s.live.impact, 3)})
-      / (${n(s.live.La, 3)} × ${n(s.live.Lb, 3)}) ＝ <b>${n(s.live.q)} kＮ/m²</b></p>
-    <p class="note">Ｌa ＝ a + 2h·tanθ ＝ ${n(s.live.La, 3)} m、
-      Ｌb ＝ ${s.live.overlap ? '左右輪の分布が重なるため 輪間隔 + 1輪の分布幅' : '2輪分の分布幅'}
-      ＝ ${n(s.live.Lb, 3)} m、衝撃係数 i ＝ ${n(s.live.impact, 3)}</p>`
+    <p class="formula">(3) 活荷重<br>
+      ① 輪分布幅 ｕ ＝ a + 2Ｈ·tanθ ＝ ${n(r.input.live.contactA, 2)} + 2 × ${n(s.cover, 3)}
+         × ${n(r.input.live.tanTheta, 2)} ＝ <b>${n(s.live.u, 3)} ｍ</b><br>
+      　　　　　　 ｖ ＝ b + 2Ｈ·tanθ ＝ ${n(s.live.v, 3)} ｍ<br>
+      ② 活荷重 Ｐl ＝ Ｐ(1+i)·β ＝ ${n(r.input.live.wheelLoad, 0)} × (1 + ${n(s.live.impact, 3)})
+         × ${n(s.live.beta, 3)} ＝ <b>${n(s.live.Pl, 3)} kＮ</b><br>
+      　　　　　 Ｐvl ＝ 2Ｐl / Ｗ / ｕ ＝ 2 × ${n(s.live.Pl, 3)} / ${n(s.live.occupancy, 2)}
+         / ${n(s.live.u, 3)} ＝ <b>${n(s.live.q)} kＮ/m²</b></p>`
     : s.liveMode === 'side' && s.surcharge > 0 ? `
     <p class="formula">(3) 活荷重 側載のため頂版に鉛直活荷重は載らない。背面の上載荷重
       Ｑ ＝ <b>${n(s.surcharge)} kＮ/m²</b> による側方土圧として考慮する。</p>`
@@ -180,6 +182,9 @@ export function buildReport(r) {
     ['(上 載)', '', i.live.enabled
       ? `Ｔ荷重 横断通行 (輪接地幅 a ＝ ${n(i.live.contactA, 2)}m  b ＝ ${n(i.live.contactB, 2)}m)`
       : '考慮しない', ''],
+    ['   後輪1輪の荷重', 'Ｐ', n(i.live.wheelLoad, 1), 'kＮ'],
+    ['   車両の占有幅', 'Ｗ', n(i.live.occupancyWidth, 2), 'm'],
+    ['   断面力低減係数', 'β', n(i.live.beta, 3), ''],
     ['(側 載)', 'Ｑ', n(i.live.surcharge), 'kＮ/m²'],
   ])}
 
@@ -287,27 +292,30 @@ export function buildReport(r) {
   </section>`;
 
   // ---- 6 せん断力に対する検討 ------------------------------------------
-  const shearRows = r.shear.map((x) => {
-    const sec = r.sections.find((y) => y.member === x.member && y.label === x.label);
-    const chk = sec ? sec.check : null;
-    return [
-      esc(x.memberName), esc(x.label.replace(x.memberName, '').trim()),
-      ...r.cases.map((c) => n(x.perCase[c.id] ?? 0, 2)),
-      `<b>${n(Math.abs(x.S), 2)}</b>`,
-      `CASE-${x.caseId}`,
-      chk ? n(chk.tau, 3) : '—', n(r.allow.tauA1, 3),
-      chk ? (chk.checks.shear.ok ? '<b class="ok">CHECK OK</b>' : '<b class="ng">CHECK NG</b>') : '—',
-    ];
-  });
   const shear = `
   <section class="chapter">
   <h2>6 せん断力に対する検討</h2>
+  <p>照査位置は支点前面から Ｔ/2 の位置とする。その位置がハンチ内にある場合、
+     部材断面の高さはハンチ高さ Ｃ' の 1/3 まで大きくとる。</p>
+  <p class="formula">ｈ' ＝ Ｔ + Ｃ'/3</p>
+
   <h3>6.1 せん断力照査点の断面力と最大値抽出</h3>
-  ${table(shearRows,
-    ['部材', '点', ...r.cases.map((c) => `CASE-${c.id}`), '最大 Ｓ', 'CASE', 'τm', 'τa', '判定'], 'num')}
+  ${table(r.shear.map((x) => [
+    esc(x.memberName), esc(x.label.replace(x.memberName, '').trim()),
+    ...r.cases.map((c) => n(x.perCase[c.id] ?? 0, 2)),
+    `<b>${n(Math.abs(x.S), 2)}</b>`, `CASE-${x.caseId}`,
+  ]), ['部材', '点', ...r.cases.map((c) => `CASE-${c.id}`), '最大 Ｓ', 'CASE'], 'num')}
+
   <h3>6.2 せん断応力度の照査</h3>
   <p class="formula">τm ＝ Ｓ / (ｂ·ｊ·ｄ) ≦ τa ＝ ${n(r.allow.tauA1, 3)} Ｎ/mm²</p>
-  <p class="note">照査位置はハンチ端とし、部材厚は基本厚を用いる(ハンチによる増加は見込まない)。</p>
+  ${table(r.shear.map((x) => [
+    esc(x.memberName), esc(x.label.replace(x.memberName, '').trim()),
+    n(x.s, 3), mm(x.T), mm(x.haunch), mm(x.hEff),
+    x.rebar ? esc(x.rebar.label) : '—',
+    n(x.check.d, 1), n(Math.abs(x.S), 2), n(x.check.tau, 3), n(r.allow.tauA1, 3),
+    x.check.ok ? '<b class="ok">CHECK OK</b>' : '<b class="ng">CHECK NG</b>',
+  ]), ['部材', '点', '位置 (m)', 'Ｔ (mm)', "Ｃ' (mm)", "ｈ' (mm)", '配筋',
+    'ｄ (mm)', 'Ｓ (kN/m)', 'τm', 'τa', '判定'], 'num')}
   </section>`;
 
   // ---- 7 安定・基礎の検討 ----------------------------------------------

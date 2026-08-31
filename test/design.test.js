@@ -195,6 +195,46 @@ test('入力チェック: 不正な入力はエラーとして返る', () => {
   assert.equal(design(bad).ok, false, 'design はエラーを返す');
 });
 
+test('せん断照査: 照査位置とハンチによる有効断面高 h\' = T + C\'/3', () => {
+  const mk = (haunch) => {
+    const i = defaultInput();
+    for (const k of ['haunchTopH', 'haunchTopV', 'haunchBottomH', 'haunchBottomV']) i.dims[k] = haunch;
+    return design(i);
+  };
+
+  // ハンチ ≦ T/2 では照査位置がハンチ端の外に出るので C' = 0、h' = T
+  const small = mk(150);
+  for (const t of small.shear) {
+    close(t.haunch, 0, 1e-9, `${t.label} の C'`);
+    close(t.hEff, t.T, 1e-9, `${t.label} の h'`);
+  }
+
+  // ハンチ 300mm・T 300mm では照査位置がハンチ内に入り、C' = 150mm、h' = 350mm
+  const big = mk(300);
+  for (const t of big.shear) {
+    close(t.haunch * 1000, 150, 1e-6, `${t.label} の C'`);
+    close(t.hEff * 1000, 350, 1e-6, `${t.label} の h'`);
+    close(t.hEff, t.T + t.haunch / 3, 1e-12, `${t.label} の h' = T + C'/3`);
+  }
+  // 有効高が増えるぶんせん断応力度は下がる
+  const tauSmall = Math.max(...small.shear.map((t) => t.check.tau));
+  const tauBig = Math.max(...big.shear.map((t) => t.check.tau));
+  assert.ok(tauBig < tauSmall, 'ハンチを大きくするとせん断応力度が下がること');
+});
+
+test('せん断照査: 照査位置が節点に乗り、左右対称になる', () => {
+  const r = design(defaultInput());
+  for (const key of ['top', 'bottom']) {
+    const pair = r.shear.filter((t) => t.member === key);
+    assert.equal(pair.length, 2, `${key} のτ点は2箇所`);
+    // 許容差は連立方程式の解の丸め誤差ぶん
+    close(Math.abs(pair[0].S), Math.abs(pair[1].S), 1e-6, `${key} の左右のせん断力`);
+  }
+  const l = r.shear.filter((t) => t.member === 'left');
+  const rt = r.shear.filter((t) => t.member === 'right');
+  l.forEach((t, k) => close(t.S, rt[k].S, 1e-6, '左右側壁のせん断力'));
+});
+
 test('標準ケースの回帰(ゴールデン値)', () => {
   const r = design(defaultInput());
   const c1 = r.cases[0]; // CASE-1: 上載・土被り1.0m
@@ -203,18 +243,19 @@ test('標準ケースの回帰(ゴールデン値)', () => {
     c1.ana.diagrams[key].reduce((b, p) => (Math.abs(p.s - pos) < Math.abs(b.s - pos) ? p : b)).M;
 
   close(s.selfWeight, 68.7225, 1e-3, '自重');
-  close(s.live.q, 32.0856, 1e-3, '活荷重圧');
-  close(s.qTop, 51.0856, 1e-3, '頂版鉛直荷重');
-  close(s.totalVertical, 186.2193, 1e-3, '全鉛直荷重');
-  close(c1.ana.maxReactionPressure, 86.495, 1e-2, '最大地盤反力度');
+  close(s.live.q, 49.5868, 1e-3, '活荷重圧');
+  close(s.qTop, 68.5868, 1e-3, '頂版鉛直荷重');
+  close(s.totalVertical, 226.4721, 1e-3, '全鉛直荷重');
+  close(c1.ana.maxReactionPressure, 105.900, 1e-2, '最大地盤反力度');
 
-  close(m('top', r.geo.L / 2), 20.051, 1e-2, '頂版中央の曲げモーメント');
-  close(m('bottom', r.geo.L / 2), 23.024, 1e-2, '底版中央の曲げモーメント');
-  close(m('top', 0), -18.769, 1e-2, '頂版隅角の曲げモーメント');
-  close(m('bottom', 0), -24.373, 1e-2, '底版隅角の曲げモーメント');
-  close(m('left', r.geo.Hc / 2), -7.122, 1e-2, '側壁中央の曲げモーメント');
+  close(m('top', r.geo.L / 2), 27.257, 1e-2, '頂版中央の曲げモーメント');
+  close(m('bottom', r.geo.L / 2), 30.052, 1e-2, '底版中央の曲げモーメント');
+  close(m('top', 0), -23.135, 1e-2, '頂版隅角の曲げモーメント');
+  close(m('bottom', 0), -28.554, 1e-2, '底版隅角の曲げモーメント');
+  close(m('left', r.geo.Hc / 2), -11.396, 1e-2, '側壁中央の曲げモーメント');
 
   assert.equal(r.cases.length, 4, '荷重ケースの数');
   assert.equal(r.sections.length, 14, '包絡した照査断面の数');
+  assert.equal(r.shear.length, 8, 'せん断照査点(τ点)の数');
   assert.equal(r.verdict.stability, true, '安定照査は成立');
 });

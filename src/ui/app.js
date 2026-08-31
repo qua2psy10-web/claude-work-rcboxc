@@ -54,7 +54,8 @@ const FIELDS = [
       { path: 'live.wheelLoad', label: '後輪1輪の荷重 P', unit: 'kN', step: 5 },
       { path: 'live.contactA', label: '接地長 a(進行方向)', unit: 'm', step: 0.05 },
       { path: 'live.contactB', label: '接地幅 b(直角方向)', unit: 'm', step: 0.05 },
-      { path: 'live.wheelSpacing', label: '左右輪の間隔', unit: 'm', step: 0.05 },
+      { path: 'live.occupancyWidth', label: '車両の占有幅 W', unit: 'm', step: 0.05 },
+      { path: 'live.beta', label: '断面力低減係数 β', step: 0.05 },
       { path: 'live.tanTheta', label: '分布角 tanθ', step: 0.1, help: '1.0 で 45°' },
       { path: 'live.impact', label: '衝撃係数 i', step: 0.05, nullable: true, help: '空欄で土被りから自動算定' },
       { path: 'live.surcharge', label: '側載時の上載荷重 Q', unit: 'kN/m²', step: 1, help: '群集荷重。側載ケースで側方土圧に加算' },
@@ -286,7 +287,7 @@ function renderResults(r) {
     <thead><tr>
       <th>照査断面</th><th>引張側</th><th>M<br><small>kN·m/m</small></th><th>N<br><small>kN/m</small></th>
       <th>Ms<br><small>kN·m/m</small></th><th>CASE</th>
-      <th>配筋</th><th>σc / σca</th><th>σs / σsa</th><th>τm / τa1</th><th>判定</th>
+      <th>配筋</th><th>σc / σca</th><th>σs / σsa</th><th>判定</th>
     </tr></thead>
     <tbody>${r.sections.map((s) => `<tr>
       <td>${s.label}</td>
@@ -294,11 +295,30 @@ function renderResults(r) {
       <td>${num(s.M, 1)}</td><td>${num(s.N, 1)}</td><td>${num(s.check.Ms, 1)}</td>
       <td>CASE-${s.caseId}</td>
       <td>${s.rebar ? s.rebar.label : '—'}</td>
-      ${cell(s.check.checks.concrete)}${cell(s.check.checks.steel)}${cell(s.check.checks.shear)}
+      ${cell(s.check.checks.concrete)}${cell(s.check.checks.steel)}
       <td>${badge(s.check.ok)}</td></tr>`).join('')}</tbody>
   </table></div>
   <p class="note">Ms ＝ M + N·c は軸力を考慮した曲げモーメント(引張鉄筋まわり)。
-     CASE 列は断面力を抽出した荷重ケースを示す。</p>`;
+     CASE 列は断面力を抽出した荷重ケースを示す。</p>
+
+  <h3>せん断照査(τ点)</h3>
+  <div class="tablewrap"><table>
+    <thead><tr>
+      <th>照査断面</th><th>位置<br><small>m</small></th><th>S<br><small>kN/m</small></th><th>CASE</th>
+      <th>T<br><small>mm</small></th><th>C'<br><small>mm</small></th><th>h'<br><small>mm</small></th>
+      <th>配筋</th><th>τm / τa1</th><th>判定</th>
+    </tr></thead>
+    <tbody>${r.shear.map((t) => `<tr>
+      <td>${t.label}</td><td>${num(t.s, 3)}</td><td>${num(Math.abs(t.S), 1)}</td>
+      <td>CASE-${t.caseId}</td>
+      <td>${Math.round(t.T * 1000)}</td><td>${Math.round(t.haunch * 1000)}</td>
+      <td>${Math.round(t.hEff * 1000)}</td>
+      <td>${t.rebar ? t.rebar.label : '—'}</td>
+      ${cell(t.check.check)}
+      <td>${badge(t.check.ok)}</td></tr>`).join('')}</tbody>
+  </table></div>
+  <p class="note">照査位置は支点前面から T/2。ハンチ内にある場合は
+     h' ＝ T + C'/3 として断面高を割り増す(C' はその位置のハンチ高さ)。</p>`;
 
   const plan = `
   <h3>配筋(主鉄筋)</h3>
@@ -336,7 +356,7 @@ function renderResults(r) {
       <tr><th>躯体自重</th><td>${num(sm.selfWeight)} kN/m</td></tr>
       <tr><th>頂版上面の鉛直土圧</th><td>${num(sm.earthTop)} kN/m² (α=${num(sm.alpha)})</td></tr>
       <tr><th>活荷重による鉛直土圧</th><td>${sm.liveMode === 'top'
-        ? `${num(sm.live.q)} kN/m² (i=${num(sm.live.impact, 3)}、分布 ${num(sm.live.La)}×${num(sm.live.Lb)} m)`
+        ? `${num(sm.live.q)} kN/m² (i=${num(sm.live.impact, 3)}、β=${num(sm.live.beta, 2)}、u=${num(sm.live.u, 3)} m)`
         : `側載のため頂版には載らない(側方の上載荷重 Q=${num(sm.surcharge)} kN/m²)`}</td></tr>
       <tr><th>頂版の鉛直荷重</th><td>${num(sm.qTop)} kN/m²</td></tr>
       <tr><th>側方土圧(上端 / 下端)</th><td>左 ${num(sm.lateralTopLeft)} / ${num(sm.lateralBottomLeft)} kN/m²、
